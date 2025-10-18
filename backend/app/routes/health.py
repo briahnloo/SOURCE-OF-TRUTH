@@ -54,3 +54,27 @@ async def health_check(db: Session = Depends(get_db)):
         total_events=total_events,
         total_articles=total_articles,
     )
+
+
+@router.get("/health/live")
+async def liveness():
+    """
+    Kubernetes/Docker liveness probe.
+    Returns 200 if the application is running.
+    """
+    return {"status": "alive"}
+
+
+@router.get("/health/ready")
+async def readiness(db: Session = Depends(get_db)):
+    """
+    Kubernetes/Docker readiness probe.
+    Returns 200 if the application is ready to serve traffic.
+    Returns 503 if database is not accessible.
+    """
+    from fastapi import HTTPException
+
+    if not check_db_health():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    return {"status": "ready", "database": "connected"}

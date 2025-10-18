@@ -11,8 +11,11 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
-    # Database
-    db_path: str = "/data/app.db"
+    # Database (supports both SQLite and PostgreSQL)
+    database_url: str = Field(
+        default="sqlite:////data/app.db",
+        description="Database connection URL. Use postgresql:// for production."
+    )
 
     # API Keys (optional)
     newsapi_key: str = ""

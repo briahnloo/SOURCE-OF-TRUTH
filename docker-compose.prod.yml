@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: truth-layer-backend-prod
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NEWSAPI_KEY=${NEWSAPI_KEY:-}
+      - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - db
+    networks:
+      - truth-layer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: truth-layer-worker-prod
+    restart: always
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NEWSAPI_KEY=${NEWSAPI_KEY:-}
+      - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+    command: python -m app.workers.scheduler
+    depends_on:
+      - db
+    networks:
+      - truth-layer-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: truth-layer-frontend-prod
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - backend
+    networks:
+      - truth-layer-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: truth-layer-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-truthlayer}
+      - POSTGRES_USER=${POSTGRES_USER:-truthlayer}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    networks:
+      - truth-layer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-truthlayer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: truth-layer-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - truth-layer-network
+
+networks:
+  truth-layer-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+

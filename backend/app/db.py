@@ -41,14 +41,16 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     """Initialize database tables"""
-    # Ensure data directory exists
-    db_dir = os.path.dirname(settings.db_path)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
+    # For SQLite, ensure data directory exists
+    if settings.database_url.startswith("sqlite"):
+        db_path = settings.database_url.replace("sqlite:///", "")
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
 
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    print(f"Database initialized at {settings.db_path}")
+    print(f"Database initialized: {settings.database_url.split('@')[-1] if '@' in settings.database_url else settings.database_url}")
 
 
 def check_db_health() -> bool:

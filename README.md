@@ -11,11 +11,12 @@ A single site showing what's actually true right now — verified via open data 
 - **Clean Dashboard**: Next.js UI with confidence meters and evidence drawers
 - **RSS Feed**: Subscribe to verified events at `/feeds/verified.xml`
 
-## Quick Start
+## Quick Start (Local Development)
 
 ```bash
-# 1. Clone and enter directory
-cd "SINGLE SOURCE OF TRUTH"
+# 1. Clone repository
+git clone https://github.com/briahnloo/SOURCE-OF-TRUTH.git
+cd SOURCE-OF-TRUTH
 
 # 2. Copy environment template
 cp .env.example .env
@@ -33,10 +34,21 @@ make dev
 # Health Check: http://localhost:8000/health
 ```
 
+## Cloud Deployment
+
+Deploy to make Truth Layer publicly accessible:
+
+- **Render.com** (Free tier available) → See [DEPLOY_RENDER.md](DEPLOY_RENDER.md)
+- **Railway.app** ($5/month all-inclusive) → See [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)
+- **DigitalOcean** (Manual VPS setup, $6/month) → See deployment plan
+
+**Estimated time**: 30 minutes to 1 hour  
+**Cost**: $0-7/month (free tiers available)
+
 ## Architecture
 
 **Stack:**
-- Backend: FastAPI + SQLAlchemy + SQLite
+- Backend: FastAPI + SQLAlchemy + SQLite/PostgreSQL
 - Worker: APScheduler (15-min ingestion cycles)
 - Frontend: Next.js 14 + Tailwind CSS
 - ML: sentence-transformers (local embeddings)

@@ -1,0 +1,14 @@
+# Production Environment Configuration for Render.com / Railway / Cloud Deployment
+# Set these as environment variables in your platform dashboard
+
+DATABASE_URL=postgresql://username:password@hostname:5432/truthlayer
+ALLOWED_ORIGINS=https://yourdomain.com
+NEWSAPI_KEY=
+MEDIASTACK_KEY=
+DISCORD_WEBHOOK_URL=
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+
+# For managed postgres services, also set:
+POSTGRES_DB=truthlayer
+POSTGRES_USER=truthlayer
+POSTGRES_PASSWORD=your_secure_password

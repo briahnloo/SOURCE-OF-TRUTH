@@ -1,0 +1,188 @@
+/**
+ * API client for Truth Layer backend
+ */
+
+// Use Docker service name for SSR (server-side), localhost for client-side
+function getApiUrl(): string {
+    // Check if we're running on the server (SSR)
+    if (typeof window === 'undefined') {
+        // Server-side: use Docker service name
+        return 'http://backend:8000';
+    }
+    // Client-side: use localhost
+    return 'http://localhost:8000';
+}
+
+export interface EventSource {
+    domain: string;
+    title: string;
+    url?: string;
+}
+
+export interface Event {
+    id: number;
+    summary: string;
+    articles_count: number;
+    unique_sources: number;
+    truth_score: number;
+    confidence_tier: string;
+    underreported: boolean;
+    first_seen: string;
+    last_seen: string;
+    sources?: EventSource[];
+}
+
+export interface EventDetail extends Event {
+    geo_diversity?: number;
+    evidence_flag: boolean;
+    official_match: boolean;
+    languages?: string[];
+    articles: Article[];
+    scoring_breakdown?: ScoringBreakdown;
+}
+
+export interface Article {
+    id: number;
+    source: string;
+    title: string;
+    url: string;
+    timestamp: string;
+    summary?: string;
+    entities?: string[];
+}
+
+export interface ScoringBreakdown {
+    source_diversity: ScoreComponent;
+    geo_diversity: ScoreComponent;
+    primary_evidence: ScoreComponent;
+    official_match: ScoreComponent;
+}
+
+export interface ScoreComponent {
+    value: number;
+    weight: number;
+    explanation: string;
+}
+
+export interface EventsResponse {
+    total: number;
+    limit: number;
+    offset: number;
+    results: Event[];
+}
+
+export interface StatsResponse {
+    total_events: number;
+    total_articles: number;
+    confirmed_events: number;
+    developing_events: number;
+    underreported_events: number;
+    avg_confidence_score: number;
+    last_ingestion?: string;
+    sources_count: number;
+    coverage_by_tier: {
+        confirmed: number;
+        developing: number;
+        unverified: number;
+    };
+    top_sources: Array<{ domain: string; article_count: number }>;
+}
+
+export interface HealthResponse {
+    status: string;
+    database: string;
+    worker_last_run?: string;
+    total_events: number;
+    total_articles: number;
+}
+
+class APIError extends Error {
+    status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.status = status;
+        this.name = 'APIError';
+    }
+}
+
+async function fetchAPI<T>(endpoint: string): Promise<T> {
+    const url = `${getApiUrl()}${endpoint}`;
+
+    try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new APIError(
+                errorData.detail || `HTTP ${response.status}: ${response.statusText}`,
+                response.status
+            );
+        }
+
+        return await response.json();
+    } catch (error) {
+        if (error instanceof APIError) {
+            throw error;
+        }
+        throw new Error(`Failed to fetch from API: ${error}`);
+    }
+}
+
+export const api = {
+    /**
+     * Get paginated list of events
+     */
+    async getEvents(params?: {
+        status?: 'confirmed' | 'developing' | 'all';
+        limit?: number;
+        offset?: number;
+        underreported?: boolean;
+    }): Promise<EventsResponse> {
+        const queryParams = new URLSearchParams();
+        if (params?.status) queryParams.set('status', params.status);
+        if (params?.limit) queryParams.set('limit', params.limit.toString());
+        if (params?.offset) queryParams.set('offset', params.offset.toString());
+        if (params?.underreported !== undefined)
+            queryParams.set('underreported', params.underreported.toString());
+
+        const query = queryParams.toString();
+        return fetchAPI<EventsResponse>(`/events${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Get detailed information for a specific event
+     */
+    async getEventDetail(id: number): Promise<EventDetail> {
+        return fetchAPI<EventDetail>(`/events/${id}`);
+    },
+
+    /**
+     * Get underreported events
+     */
+    async getUnderreported(params?: {
+        limit?: number;
+        offset?: number;
+    }): Promise<EventsResponse> {
+        const queryParams = new URLSearchParams();
+        if (params?.limit) queryParams.set('limit', params.limit.toString());
+        if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+        const query = queryParams.toString();
+        return fetchAPI<EventsResponse>(`/events/underreported${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Get aggregate statistics
+     */
+    async getStats(): Promise<StatsResponse> {
+        return fetchAPI<StatsResponse>('/events/stats/summary');
+    },
+
+    /**
+     * Check system health
+     */
+    async getHealth(): Promise<HealthResponse> {
+        return fetchAPI<HealthResponse>('/health');
+    },
+};

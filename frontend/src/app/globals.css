@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 249, 250, 251;
+    --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --foreground-rgb: 255, 255, 255;
+        --background-start-rgb: 17, 24, 39;
+        --background-end-rgb: 31, 41, 55;
+    }
+}
+
+body {
+    color: rgb(var(--foreground-rgb));
+    background: linear-gradient(to bottom,
+            transparent,
+            rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+    min-height: 100vh;
+}
+
+@layer components {
+    .btn-primary {
+        @apply px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-all duration-200 hover:shadow-lg hover:scale-105;
+    }
+
+    .btn-secondary {
+        @apply px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200;
+    }
+
+    .card {
+        @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lift;
+    }
+
+    /* Loading shimmer effect */
+    .shimmer {
+        @apply relative overflow-hidden bg-gray-200 dark:bg-gray-700 rounded;
+    }
+
+    .shimmer::after {
+        content: '';
+        @apply absolute top-0 right-0 bottom-0 left-0;
+        background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.4),
+                transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+        0% {
+            transform: translateX(-100%);
+        }
+
+        100% {
+            transform: translateX(100%);
+        }
+    }
+
+    /* Gradient backgrounds */
+    .gradient-hero {
+        background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 50%, #94a3b8 100%);
+    }
+
+    .gradient-confirmed {
+        background: linear-gradient(90deg, #22c55e 0%, #86efac 100%);
+    }
+
+    .gradient-developing {
+        background: linear-gradient(90deg, #f59e0b 0%, #fcd34d 100%);
+    }
+
+    .gradient-underreported {
+        background: linear-gradient(90deg, #8b5cf6 0%, #c4b5fd 100%);
+    }
+}
+
+@layer utilities {
+
+    /* Reduce motion for accessibility */
+    @media (prefers-reduced-motion: reduce) {
+
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+
+    /* Number font variant */
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
+    }
+}

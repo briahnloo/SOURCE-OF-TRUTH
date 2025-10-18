@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: truth-layer-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./backend:/app
+    environment:
+      - DB_PATH=/data/app.db
+      - NEWSAPI_KEY=${NEWSAPI_KEY:-}
+      - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - worker
+    networks:
+      - truth-layer-network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: truth-layer-worker
+    volumes:
+      - ./data:/data
+      - ./backend:/app
+    environment:
+      - DB_PATH=/data/app.db
+      - NEWSAPI_KEY=${NEWSAPI_KEY:-}
+      - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+    command: python -m app.workers.scheduler
+    networks:
+      - truth-layer-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: truth-layer-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - truth-layer-network
+
+networks:
+  truth-layer-network:
+    driver: bridge
+
+volumes:
+  data:

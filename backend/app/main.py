@@ -16,7 +16,8 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     print("Starting Truth Layer Backend...")
-    print(f"Database: {settings.db_path}")
+    db_info = settings.database_url.split('@')[-1] if '@' in settings.database_url else settings.database_url
+    print(f"Database: {db_info}")
     print(f"Allowed origins: {settings.allowed_origins}")
 
     # Initialize database

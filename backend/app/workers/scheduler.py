@@ -141,7 +141,8 @@ def run_ingestion_pipeline() -> None:
 def main():
     """Main worker entry point"""
     print("🚀 Truth Layer Worker Starting...")
-    print(f"Database: {settings.db_path}")
+    db_info = settings.database_url.split('@')[-1] if '@' in settings.database_url else settings.database_url
+    print(f"Database: {db_info}")
     print(f"Ingestion interval: 15 minutes")
     print(f"Clustering window: {settings.clustering_window_hours} hours")
     print(f"Article retention: {settings.article_retention_days} days\n")

@@ -8,12 +8,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
-# Create SQLite engine
-database_url = f"sqlite:///{settings.db_path}"
+# Create database engine (supports both SQLite and PostgreSQL)
+is_sqlite = settings.database_url.startswith("sqlite")
+
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+
 engine = create_engine(
-    database_url,
-    connect_args={"check_same_thread": False},  # SQLite specific
+    settings.database_url,
+    connect_args=connect_args,
     echo=False,  # Set to True for SQL query logging
+    pool_pre_ping=True,  # Verify connections before using
 )
 
 # Session factory

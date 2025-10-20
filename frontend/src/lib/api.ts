@@ -2,14 +2,19 @@
  * API client for Truth Layer backend
  */
 
-// Use Docker service name for SSR (server-side), localhost for client-side
+// Use environment variable for production, localhost for development
 function getApiUrl(): string {
-    // Check if we're running on the server (SSR)
+    // In production, NEXT_PUBLIC_API_URL will be set to the Render backend URL
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    // Development fallback
     if (typeof window === 'undefined') {
         // Server-side: use 127.0.0.1 (localhost sometimes fails in Node.js SSR)
-        return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+        return 'http://127.0.0.1:8000';
     }
-    // Client-side: use localhost  
+    // Client-side: use localhost
     return 'http://localhost:8000';
 }
 

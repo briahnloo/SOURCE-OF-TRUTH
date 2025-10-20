@@ -38,11 +38,12 @@ make dev
 
 Deploy to make Truth Layer publicly accessible:
 
+- **Vercel + Render** (Recommended, Free tier) → See [DEPLOY.md](DEPLOY.md)
 - **Render.com** (Free tier available) → See [DEPLOY_RENDER.md](DEPLOY_RENDER.md)
 - **Railway.app** ($5/month all-inclusive) → See [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)
 - **DigitalOcean** (Manual VPS setup, $6/month) → See deployment plan
 
-**Estimated time**: 30 minutes to 1 hour  
+**Estimated time**: 30-45 minutes  
 **Cost**: $0-7/month (free tiers available)
 
 ## Architecture

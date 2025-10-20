@@ -24,7 +24,8 @@ services:
           name: truthlayer-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://groundtruth.vercel.app
+        # Update this after Vercel deployment with your actual frontend URL
       - key: NEWSAPI_KEY
         sync: false
       - key: MEDIASTACK_KEY

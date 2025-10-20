@@ -508,7 +508,7 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                     ) : (
                                         // Clean fallback when no excerpts are available - just show article links
                                         <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 italic">
-                                            📰 Read full articles to compare this perspective (see "Read the Articles" section below)
+                                            📰 Read full articles to compare this perspective (see &quot;Read the Articles&quot; section below)
                                         </div>
                                     )}
                                 </div>

@@ -121,7 +121,7 @@ export default function QuickCompare({ explanation, onExpand }: Props) {
                                         <span className="font-medium">Focus: </span>
                                         {perspective.focus_keywords.slice(0, 5).map((kw, i) => (
                                             <span key={i}>
-                                                "{kw}"
+                                                &quot;{kw}&quot;
                                                 {i < Math.min(4, perspective.focus_keywords.length - 1) ? ', ' : ''}
                                             </span>
                                         ))}

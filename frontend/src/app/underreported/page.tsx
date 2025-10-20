@@ -2,7 +2,7 @@ import { api } from '@/lib/api';
 import EventCard from '@/components/EventCard';
 import EmptyState from '@/components/EmptyState';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function UnderreportedPage() {
     let events: any[] = [];

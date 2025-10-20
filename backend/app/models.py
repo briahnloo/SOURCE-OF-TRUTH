@@ -31,6 +31,8 @@ class Article(Base):
     text_snippet = Column(Text)
     entities_json = Column(Text)  # JSON string: ["entity1", "entity2"]
     cluster_id = Column(Integer, ForeignKey("events.id"), nullable=True, index=True)
+    fact_check_status = Column(String(20), nullable=True)  # 'verified', 'disputed', 'false', 'unverified'
+    fact_check_flags_json = Column(Text, nullable=True)  # JSON array of FactCheckFlag objects
     ingested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
@@ -51,6 +53,13 @@ class Event(Base):
     official_match = Column(Boolean, default=False, nullable=False)
     truth_score = Column(Float, nullable=False, index=True)
     underreported = Column(Boolean, default=False, nullable=False, index=True)
+    coherence_score = Column(Float, nullable=True, index=True)
+    has_conflict = Column(Boolean, default=False, nullable=False, index=True)
+    conflict_severity = Column(String(10), nullable=True)  # 'none', 'low', 'medium', 'high'
+    conflict_explanation_json = Column(Text, nullable=True)  # JSON-encoded ConflictExplanation
+    bias_compass_json = Column(Text, nullable=True)  # JSON-encoded BiasScore
+    category = Column(String(50), nullable=True, index=True)  # 'politics', 'natural_disaster', 'health', 'crime', 'international', 'other'
+    category_confidence = Column(Float, nullable=True)  # 0.0-1.0 confidence in categorization
     first_seen = Column(DateTime, nullable=False, index=True)
     last_seen = Column(DateTime, nullable=False)
     languages_json = Column(Text)  # JSON string: ["en", "es"]

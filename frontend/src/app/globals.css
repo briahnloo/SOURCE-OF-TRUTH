@@ -78,6 +78,51 @@ body {
     .gradient-underreported {
         background: linear-gradient(90deg, #8b5cf6 0%, #c4b5fd 100%);
     }
+
+    /* Event card enhancements */
+    .event-card-natural {
+        @apply opacity-75;
+    }
+
+    .event-card-conflict {
+        @apply border-l-4 border-red-400 dark:border-red-600;
+    }
+
+    .event-card-high-trust {
+        @apply shadow-lg border-green-200 dark:border-green-800;
+    }
+
+    /* Animation for fade in */
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .animate-fade-in {
+        animation: fade-in 0.3s ease-out;
+    }
+
+    /* Animation for slide up */
+    @keyframes slide-up {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-slide-up {
+        animation: slide-up 0.4s ease-out both;
+    }
 }
 
 @layer utilities {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import InfoTooltip from './InfoTooltip';
 
 interface ConfidenceMeterProps {
     score: number;
@@ -57,9 +58,20 @@ export default function ConfidenceMeter({ score, tier }: ConfidenceMeterProps) {
         <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
             {/* Score label */}
             <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    Confidence Score
-                </span>
+                <div className="flex items-center space-x-1">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Verification Level
+                    </span>
+                    <InfoTooltip content={`Verification Level measures story reliability based on:
+• Source Diversity (25%): Multiple independent sources
+• Geographic Coverage (40%): Stories from different regions
+• Official Sources (20%): Government/NGO verification
+• Evidence Quality (15%): Links to primary sources
+
+Highly Verified (75+) = Confirmed by many sources
+Moderately Verified (40-74) = Being verified
+Low Verification (<40) = Few sources, unverified`} />
+                </div>
                 <span
                     className={`text-3xl font-bold tabular-nums ${getTextColor()} ${needsGlow ? 'animate-pulse-glow' : ''
                         }`}
@@ -83,12 +95,14 @@ export default function ConfidenceMeter({ score, tier }: ConfidenceMeterProps) {
                 <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getBadgeColor()}`}
                 >
-                    {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                    {tier === 'confirmed' && 'Highly Verified'}
+                    {tier === 'developing' && 'Moderately Verified'}
+                    {tier !== 'confirmed' && tier !== 'developing' && 'Low Verification'}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {tier === 'confirmed' && '≥ 75'}
+                    {tier === 'confirmed' && '75-100'}
                     {tier === 'developing' && '40-74'}
-                    {tier !== 'confirmed' && tier !== 'developing' && '< 40'}
+                    {tier !== 'confirmed' && tier !== 'developing' && '0-39'}
                 </span>
             </div>
         </div>

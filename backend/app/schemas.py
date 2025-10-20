@@ -15,11 +15,60 @@ class ArticleBase(BaseModel):
     summary: Optional[str] = None
 
 
+class FactCheckFlag(BaseModel):
+    """Represents a specific claim that failed fact-checking"""
+    claim: str
+    verdict: str  # 'false', 'disputed', 'misleading'
+    evidence_source: str
+    evidence_url: Optional[str] = None
+    explanation: str
+    confidence: float
+    claim_context: Optional[str] = None     # Surrounding sentences for transparency
+    claim_location: Optional[str] = None    # "headline", "lead", "body"
+
+
+class FlaggedArticle(BaseModel):
+    """Article that failed fact-checking"""
+    id: int
+    source: str
+    title: str
+    url: str
+    timestamp: datetime
+    fact_check_status: str
+    fact_check_flags: List[FactCheckFlag]
+    
+    class Config:
+        from_attributes = True
+
+
+class SourceErrorStats(BaseModel):
+    """Error statistics for a news source"""
+    domain: str
+    flagged_count: int
+    false_count: int
+    disputed_count: int
+    total_articles: int
+    error_rate: float
+    impact_score: float
+
+
+class FlaggedArticlesResponse(BaseModel):
+    """Response for flagged articles endpoint"""
+    total: int
+    limit: int
+    offset: int
+    articles: List[FlaggedArticle]
+    source_stats: List[SourceErrorStats]
+    summary: Dict[str, int]
+
+
 class ArticleDetail(ArticleBase):
     id: int
     language: Optional[str] = None
     text_snippet: Optional[str] = None
     entities: Optional[List[str]] = None
+    fact_check_status: Optional[str] = None
+    fact_check_flags: Optional[List[FactCheckFlag]] = None
 
     class Config:
         from_attributes = True
@@ -30,6 +79,7 @@ class EventSource(BaseModel):
     domain: str
     title: str
     url: Optional[str] = None
+    political_bias: Optional[Dict[str, float]] = None  # {"left": 0.3, "center": 0.6, "right": 0.1}
 
 
 class ScoringBreakdown(BaseModel):
@@ -37,6 +87,51 @@ class ScoringBreakdown(BaseModel):
     geo_diversity: Dict[str, Any]
     primary_evidence: Dict[str, Any]
     official_match: Dict[str, Any]
+
+
+class ConflictDetail(BaseModel):
+    has_conflict: bool
+    severity: str
+    coherence_score: float
+    embedding_similarity: Optional[float] = None
+    entity_overlap: Optional[float] = None
+    title_consistency: Optional[float] = None
+
+
+class ArticleExcerpt(BaseModel):
+    """Represents a key excerpt from an article showing perspective differences"""
+    source: str
+    title: str
+    url: str
+    excerpt: str
+    relevance_score: float
+
+
+class NarrativePerspective(BaseModel):
+    """Represents a narrative perspective within a conflicting event"""
+    sources: List[str]
+    article_count: int
+    representative_title: str
+    key_entities: List[str]
+    sentiment: str
+    focus_keywords: List[str]
+    political_leaning: Optional[str] = None
+    representative_excerpts: Optional[List[ArticleExcerpt]] = None
+
+
+class ConflictExplanation(BaseModel):
+    """Explains why sources present different narratives"""
+    perspectives: List[NarrativePerspective]
+    key_difference: str
+    difference_type: str
+
+
+class BiasCompass(BaseModel):
+    """Source bias distribution across four dimensions"""
+    geographic: Dict[str, float]
+    political: Dict[str, float]
+    tone: Dict[str, float]
+    detail: Dict[str, float]
 
 
 class EventBase(BaseModel):
@@ -47,6 +142,13 @@ class EventBase(BaseModel):
     truth_score: float
     confidence_tier: str
     underreported: bool
+    coherence_score: Optional[float] = None
+    has_conflict: bool = False
+    conflict_severity: Optional[str] = None
+    conflict_explanation: Optional[ConflictExplanation] = None
+    bias_compass: Optional[BiasCompass] = None
+    category: Optional[str] = None
+    category_confidence: Optional[float] = None
     first_seen: datetime
     last_seen: datetime
 
@@ -111,7 +213,9 @@ class StatsResponse(BaseModel):
     confirmed_events: int
     developing_events: int
     underreported_events: int
+    conflict_events: int
     avg_confidence_score: float
+    avg_coherence_score: float
     last_ingestion: Optional[datetime]
     sources_count: int
     coverage_by_tier: CoverageTier

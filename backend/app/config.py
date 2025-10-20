@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings"""
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Database (supports both SQLite and PostgreSQL)
     database_url: str = Field(
@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # API Keys (optional)
     newsapi_key: str = ""
     mediastack_key: str = ""
+    google_factcheck_api_key: str = ""
 
     # Monitoring
     discord_webhook_url: str = ""

@@ -1,6 +1,7 @@
 """Article normalization and deduplication"""
 
 import json
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -12,6 +13,23 @@ from sqlalchemy.orm import Session
 
 # Load spaCy model (lazy loading)
 _nlp = None
+
+# Load fact-checker (lazy loading)
+_fact_checker = None
+
+
+def get_fact_checker():
+    """Lazy load fact checker"""
+    global _fact_checker
+    if _fact_checker is None:
+        try:
+            from app.services.fact_check import FactChecker
+
+            _fact_checker = FactChecker()
+        except Exception as e:
+            print(f"Warning: Could not load fact checker: {e}")
+            _fact_checker = None
+    return _fact_checker
 
 
 def get_nlp():
@@ -189,6 +207,25 @@ def normalize_and_store(articles: List[Dict[str, Any]], db: Session) -> tuple[in
             entities_json=json.dumps(entities),
             cluster_id=None,  # Will be assigned later
         )
+
+        # Run fact-checking
+        fact_checker = get_fact_checker()
+        if fact_checker:
+            try:
+                status, flags = fact_checker.check_article(
+                    title=article.title,
+                    summary=article.summary or "",
+                    url=article.url,
+                    source=article.source,
+                )
+                article.fact_check_status = status
+                if flags:
+                    article.fact_check_flags_json = json.dumps(
+                        [asdict(f) for f in flags]
+                    )
+            except Exception as e:
+                print(f"Fact-check error for {article.url}: {e}")
+                # Continue without fact-check data
 
         try:
             db.add(article)

@@ -39,6 +39,8 @@ export default function RootLayout({
                                     <NavLink href="/">Confirmed</NavLink>
                                     <NavLink href="/developing">Developing</NavLink>
                                     <NavLink href="/underreported">Underreported</NavLink>
+                                    <NavLink href="/conflicts">Conflicts</NavLink>
+                                    <NavLink href="/flagged">Flagged</NavLink>
                                     <NavLink href="/stats">Stats</NavLink>
 
                                     {/* Health indicator */}

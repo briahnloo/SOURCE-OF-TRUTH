@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 import StatsPanel from '@/components/StatsPanel';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function StatsPage() {
     let stats: any = null;
@@ -86,8 +86,8 @@ export default async function StatsPage() {
                                             className="gradient-confirmed h-3 rounded-full transition-all duration-1000"
                                             style={{
                                                 width: `${stats.total_events > 0
-                                                        ? (stats.coverage_by_tier.confirmed / stats.total_events) * 100
-                                                        : 0
+                                                    ? (stats.coverage_by_tier.confirmed / stats.total_events) * 100
+                                                    : 0
                                                     }%`,
                                             }}
                                         />
@@ -111,8 +111,8 @@ export default async function StatsPage() {
                                             className="gradient-developing h-3 rounded-full transition-all duration-1000"
                                             style={{
                                                 width: `${stats.total_events > 0
-                                                        ? (stats.coverage_by_tier.developing / stats.total_events) * 100
-                                                        : 0
+                                                    ? (stats.coverage_by_tier.developing / stats.total_events) * 100
+                                                    : 0
                                                     }%`,
                                             }}
                                         />
@@ -136,8 +136,8 @@ export default async function StatsPage() {
                                             className="bg-gray-400 h-3 rounded-full transition-all duration-1000"
                                             style={{
                                                 width: `${stats.total_events > 0
-                                                        ? (stats.coverage_by_tier.unverified / stats.total_events) * 100
-                                                        : 0
+                                                    ? (stats.coverage_by_tier.unverified / stats.total_events) * 100
+                                                    : 0
                                                     }%`,
                                             }}
                                         />

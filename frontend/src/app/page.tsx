@@ -3,7 +3,7 @@ import EventCard from '@/components/EventCard';
 import HeroSection from '@/components/HeroSection';
 import EmptyState from '@/components/EmptyState';
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const dynamic = 'force-dynamic'; // Revalidate every 60 seconds
 
 export default async function HomePage() {
     let events: any[] = [];

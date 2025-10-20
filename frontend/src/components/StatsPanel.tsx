@@ -95,6 +95,21 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                 </div>
             </div>
 
+            {/* Conflicts */}
+            <div className="card bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/20 dark:to-gray-900 border-l-4 border-yellow-500 hover:scale-105 transition-transform duration-200">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide">
+                            Conflicting Narratives
+                        </div>
+                        <div className="mt-2 text-4xl font-bold text-yellow-700 dark:text-yellow-400">
+                            <AnimatedNumber value={stats.conflict_events} />
+                        </div>
+                    </div>
+                    <div className="text-4xl">⚠️</div>
+                </div>
+            </div>
+
             {/* Avg Score */}
             <div className="card bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 hover:scale-105 transition-transform duration-200">
                 <div className="flex items-center justify-between">
@@ -107,6 +122,21 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">⭐</div>
+                </div>
+            </div>
+
+            {/* Avg Coherence */}
+            <div className="card bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 hover:scale-105 transition-transform duration-200">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Avg Source Agreement
+                        </div>
+                        <div className="mt-2 text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
+                            {stats.avg_coherence_score.toFixed(1)}
+                        </div>
+                    </div>
+                    <div className="text-4xl opacity-20">🤝</div>
                 </div>
             </div>
 

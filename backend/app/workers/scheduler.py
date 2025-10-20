@@ -1,5 +1,7 @@
 """APScheduler worker for periodic ingestion pipeline"""
 
+import json
+from dataclasses import asdict
 from datetime import datetime, timedelta
 
 import requests
@@ -17,6 +19,7 @@ from app.services.fetch.reddit import fetch_reddit_articles
 from app.services.fetch.rss import fetch_rss_articles
 
 # Import processors
+from app.services.fact_check import FactChecker
 from app.services.normalize import normalize_and_store
 from app.services.score import score_recent_events
 from app.services.underreported import detect_underreported
@@ -53,6 +56,79 @@ def cleanup_old_articles(db: Session) -> int:
     return deleted
 
 
+def run_fact_check_pipeline(db: Session, max_articles: int = 50) -> tuple[int, int]:
+    """
+    Fact-check recent unchecked articles.
+    
+    Args:
+        db: Database session
+        max_articles: Maximum number of articles to check per run (to avoid API limits)
+        
+    Returns:
+        Tuple of (checked_count, flagged_count)
+    """
+    fact_checker = FactChecker()
+    
+    # Check if API key is configured
+    if not fact_checker.google_api_key:
+        print("⚠️  Google Fact Check API key not configured, skipping fact-checking")
+        return 0, 0
+    
+    # Get recent unchecked articles
+    articles = (
+        db.query(Article)
+        .filter(Article.fact_check_status == None)
+        .order_by(Article.timestamp.desc())
+        .limit(max_articles)
+        .all()
+    )
+    
+    if not articles:
+        return 0, 0
+    
+    checked = 0
+    flagged = 0
+    
+    for article in articles:
+        try:
+            # Run fact-checking
+            status, flags = fact_checker.check_article(
+                title=article.title,
+                summary=article.summary or "",
+                url=article.url,
+                source=article.source
+            )
+            
+            # Store results
+            article.fact_check_status = status
+            
+            if flags:
+                flags_data = [asdict(f) for f in flags]
+                article.fact_check_flags_json = json.dumps(flags_data)
+                flagged += 1
+                
+                # Send alert for flagged content
+                if status == "false":
+                    send_discord_alert(
+                        f"❌ False claim detected: {article.title[:80]}... "
+                        f"({len(flags)} flags)"
+                    )
+            else:
+                article.fact_check_flags_json = None
+            
+            db.commit()
+            checked += 1
+            
+        except Exception as e:
+            print(f"⚠️  Error fact-checking article {article.id}: {e}")
+            # Mark as unverified on error to avoid re-checking
+            article.fact_check_status = "unverified"
+            db.commit()
+            continue
+    
+    return checked, flagged
+
+
 def run_ingestion_pipeline() -> None:
     """
     Main ingestion pipeline job.
@@ -63,7 +139,8 @@ def run_ingestion_pipeline() -> None:
         3. Cluster articles
         4. Score events
         5. Detect underreported
-        6. Cleanup old data
+        6. Fact-check articles
+        7. Cleanup old data
     """
     start_time = datetime.utcnow()
     print(f"\n{'='*60}")
@@ -116,8 +193,13 @@ def run_ingestion_pipeline() -> None:
         underreported_count = detect_underreported(db)
         print(f"✅ Underreported events: {underreported_count}\n")
 
-        # Step 6: Cleanup
-        print("🗑️  Step 6: Cleaning up old articles...")
+        # Step 6: Fact-check articles
+        print("🔍 Step 6: Fact-checking new articles...")
+        fact_checked, flagged = run_fact_check_pipeline(db)
+        print(f"✅ Fact-checked: {fact_checked}, Flagged: {flagged}\n")
+
+        # Step 7: Cleanup
+        print("🗑️  Step 7: Cleaning up old articles...")
         cleanup_old_articles(db)
 
         # Success summary

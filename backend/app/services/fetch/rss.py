@@ -24,6 +24,15 @@ RSS_FEEDS = [
     # Additional outlets
     "https://www.economist.com/the-world-this-week/rss.xml",
     "https://www.independent.co.uk/news/world/rss",
+    # Conservative outlets
+    "https://moxie.foxnews.com/google-publisher/latest.xml",
+    "https://www.wsj.com/xml/rss/3_7085.xml",
+    "https://www.dailywire.com/feeds/rss.xml",
+    "https://www.nationalreview.com/feed/",
+    "https://www.breitbart.com/feed/",
+    "https://nypost.com/feed/",
+    "https://www.washingtonexaminer.com/feed/",
+    "https://thehill.com/feed/",
 ]
 
 

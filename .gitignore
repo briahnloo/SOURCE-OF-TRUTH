@@ -1,6 +1,8 @@
 # Environment
 .env
 .env.local
+.env.bak
+*.env.bak
 
 # Database
 data/
@@ -20,6 +22,9 @@ pip-log.txt
 .pytest_cache/
 .coverage
 htmlcov/
+*.egg-info/
+dist/
+build/
 
 # Node
 node_modules/

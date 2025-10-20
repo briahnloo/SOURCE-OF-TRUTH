@@ -97,8 +97,8 @@ export default function QuickCompare({ explanation, onExpand }: Props) {
 
                     {/* Quick Perspective Summaries */}
                     {explanation.perspectives.map((perspective, idx) => {
-                        const firstExcerpt = perspective.representative_excerpts && perspective.representative_excerpts.length > 0
-                            ? perspective.representative_excerpts[0]
+                        const firstExcerpt = (perspective as any).representative_excerpts && (perspective as any).representative_excerpts.length > 0 
+                            ? (perspective as any).representative_excerpts[0] 
                             : null;
                         const firstSource = perspective.sources[0];
 

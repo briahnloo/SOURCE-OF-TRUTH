@@ -43,6 +43,35 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def run_migrations() -> None:
+    """Run database migrations"""
+    try:
+        db = SessionLocal()
+        
+        # Check if category column exists
+        result = db.execute(text("PRAGMA table_info(events)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        # Add category column if it doesn't exist
+        if 'category' not in columns:
+            print("➕ Adding 'category' column...")
+            db.execute(text("ALTER TABLE events ADD COLUMN category VARCHAR(50)"))
+            print("✓ Added 'category' column")
+        
+        # Add category_confidence column if it doesn't exist
+        if 'category_confidence' not in columns:
+            print("➕ Adding 'category_confidence' column...")
+            db.execute(text("ALTER TABLE events ADD COLUMN category_confidence FLOAT"))
+            print("✓ Added 'category_confidence' column")
+        
+        db.commit()
+        db.close()
+        print("✅ Database migrations completed")
+        
+    except Exception as e:
+        print(f"⚠️ Migration error (may be expected for PostgreSQL): {e}")
+
+
 def init_db() -> None:
     """Initialize database tables"""
     # For SQLite, ensure data directory exists
@@ -54,6 +83,10 @@ def init_db() -> None:
 
     # Create all tables
     Base.metadata.create_all(bind=engine)
+    
+    # Run migrations
+    run_migrations()
+    
     print(f"Database initialized: {settings.database_url.split('@')[-1] if '@' in settings.database_url else settings.database_url}")
 
 

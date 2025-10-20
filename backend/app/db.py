@@ -48,28 +48,46 @@ def run_migrations() -> None:
     try:
         db = SessionLocal()
         
-        # Check if category column exists
-        result = db.execute(text("PRAGMA table_info(events)"))
-        columns = [row[1] for row in result.fetchall()]
+        # Detect database type
+        is_postgres = 'postgresql' in settings.database_url.lower()
+        
+        if is_postgres:
+            # PostgreSQL: Check columns using information_schema
+            result = db.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'events'
+            """))
+            columns = [row[0] for row in result.fetchall()]
+        else:
+            # SQLite: Use PRAGMA
+            result = db.execute(text("PRAGMA table_info(events)"))
+            columns = [row[1] for row in result.fetchall()]
         
         # Add category column if it doesn't exist
         if 'category' not in columns:
             print("➕ Adding 'category' column...")
             db.execute(text("ALTER TABLE events ADD COLUMN category VARCHAR(50)"))
+            db.commit()
             print("✓ Added 'category' column")
         
         # Add category_confidence column if it doesn't exist
         if 'category_confidence' not in columns:
             print("➕ Adding 'category_confidence' column...")
-            db.execute(text("ALTER TABLE events ADD COLUMN category_confidence FLOAT"))
+            if is_postgres:
+                db.execute(text("ALTER TABLE events ADD COLUMN category_confidence DOUBLE PRECISION"))
+            else:
+                db.execute(text("ALTER TABLE events ADD COLUMN category_confidence FLOAT"))
+            db.commit()
             print("✓ Added 'category_confidence' column")
         
-        db.commit()
         db.close()
         print("✅ Database migrations completed")
         
     except Exception as e:
-        print(f"⚠️ Migration error (may be expected for PostgreSQL): {e}")
+        print(f"⚠️ Migration error: {e}")
+        # Don't fail startup if migrations fail
+        pass
 
 
 def init_db() -> None:

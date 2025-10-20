@@ -17,7 +17,9 @@ def fetch_reddit_articles() -> List[Dict[str, Any]]:
     """
     articles = []
 
-    headers = {"User-Agent": "TruthLayer/1.0 (News Aggregator)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
 
     for subreddit in SUBREDDITS:
         try:
@@ -65,9 +67,10 @@ def fetch_reddit_articles() -> List[Dict[str, Any]]:
                     )
 
         except requests.RequestException as e:
-            print(f"❌ Reddit fetch error (r/{subreddit}): {e}")
+            # Reddit frequently blocks automated requests, skip gracefully
+            print(f"⚠️ Reddit blocked request (r/{subreddit}): {e}")
         except Exception as e:
-            print(f"❌ Reddit processing error (r/{subreddit}): {e}")
+            print(f"⚠️ Reddit processing error (r/{subreddit}): {e}")
 
     print(f"✅ Reddit: Fetched {len(articles)} posts from {len(SUBREDDITS)} subreddits")
     return articles

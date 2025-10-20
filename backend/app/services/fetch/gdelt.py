@@ -45,6 +45,11 @@ def fetch_gdelt_articles(minutes: int = 15) -> List[Dict[str, Any]]:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
+        # Handle empty response
+        if not response.text or response.text.strip() == "":
+            print("⚠️ GDELT: Empty response, skipping")
+            return articles
+
         data = response.json()
 
         if "articles" in data:
@@ -74,8 +79,10 @@ def fetch_gdelt_articles(minutes: int = 15) -> List[Dict[str, Any]]:
         print(f"✅ GDELT: Fetched {len(articles)} articles")
 
     except requests.RequestException as e:
-        print(f"❌ GDELT fetch error: {e}")
+        print(f"⚠️ GDELT API error (skipping): {e}")
+    except ValueError as e:
+        print(f"⚠️ GDELT JSON parsing error (empty/invalid response): {e}")
     except Exception as e:
-        print(f"❌ GDELT processing error: {e}")
+        print(f"⚠️ GDELT processing error (skipping): {e}")
 
     return articles

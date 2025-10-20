@@ -1,5 +1,6 @@
 """FastAPI application entry point"""
 
+import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -10,10 +11,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# Optional scheduler import (only if enabled)
+scheduler = None
+if os.getenv("ENABLE_SCHEDULER", "").lower() == "true":
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.interval import IntervalTrigger
+    from app.workers.scheduler import run_ingestion_pipeline
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
+    global scheduler
+    
     # Startup
     print("Starting Truth Layer Backend...")
     db_info = settings.database_url.split('@')[-1] if '@' in settings.database_url else settings.database_url
@@ -32,10 +42,35 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize database: {e}")
         sys.exit(1)
 
+    # Start background scheduler if enabled
+    if os.getenv("ENABLE_SCHEDULER", "").lower() == "true":
+        print("🔄 Starting background scheduler...")
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(
+            run_ingestion_pipeline,
+            trigger=IntervalTrigger(minutes=15),
+            id="ingestion_pipeline",
+            name="Ingestion Pipeline",
+            replace_existing=True,
+        )
+        scheduler.start()
+        print("✅ Background scheduler started (15-minute interval)")
+        
+        # Run once immediately in background
+        scheduler.add_job(
+            run_ingestion_pipeline,
+            id="initial_run",
+            name="Initial Pipeline Run",
+        )
+
     yield
 
     # Shutdown
     print("Shutting down Truth Layer Backend...")
+    if scheduler:
+        print("Stopping scheduler...")
+        scheduler.shutdown()
+        print("✅ Scheduler stopped")
 
 
 # Create FastAPI app

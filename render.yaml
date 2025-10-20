@@ -1,5 +1,7 @@
 # Render.com Infrastructure as Code
 # This file allows one-click deployment to Render
+# Note: Worker service removed (not supported on free tier)
+# Note: Frontend removed (deploying to Vercel instead)
 
 databases:
   - name: truthlayer-db
@@ -9,7 +11,7 @@ databases:
     region: oregon
 
 services:
-  # Backend API
+  # Backend API (includes scheduled worker via APScheduler)
   - type: web
     name: truthlayer-backend
     runtime: docker
@@ -32,37 +34,7 @@ services:
         sync: false
       - key: DISCORD_WEBHOOK_URL
         sync: false
-
-  # Background Worker
-  - type: worker
-    name: truthlayer-worker
-    runtime: docker
-    region: oregon
-    plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    dockerCommand: python -m app.workers.scheduler
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: truthlayer-db
-          property: connectionString
-      - key: NEWSAPI_KEY
-        sync: false
-      - key: MEDIASTACK_KEY
-        sync: false
-      - key: DISCORD_WEBHOOK_URL
-        sync: false
-
-  # Frontend
-  - type: web
-    name: truthlayer-frontend
-    runtime: docker
-    region: oregon
-    plan: free
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        value: https://truthlayer-backend.onrender.com
+      - key: ENABLE_SCHEDULER
+        value: "true"
+        # Set to "true" to run background worker within web service
 

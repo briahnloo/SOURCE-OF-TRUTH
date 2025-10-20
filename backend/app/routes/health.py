@@ -78,3 +78,33 @@ async def readiness(db: Session = Depends(get_db)):
         raise HTTPException(status_code=503, detail="Database not ready")
 
     return {"status": "ready", "database": "connected"}
+
+
+@router.post("/health/ingest")
+async def trigger_ingestion(db: Session = Depends(get_db)):
+    """
+    Manually trigger data ingestion pipeline.
+    This will fetch articles from all sources and populate the database.
+    """
+    try:
+        from app.workers.scheduler import run_ingestion_pipeline
+        
+        # Run the ingestion pipeline
+        run_ingestion_pipeline()
+        
+        # Get updated counts
+        total_events = db.query(func.count(Event.id)).scalar() or 0
+        total_articles = db.query(func.count(Article.id)).scalar() or 0
+        
+        return {
+            "status": "success",
+            "message": "Ingestion pipeline completed",
+            "total_events": total_events,
+            "total_articles": total_articles
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Ingestion failed: {str(e)}"
+        }

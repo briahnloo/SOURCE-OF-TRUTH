@@ -1,6 +1,7 @@
 """APScheduler worker for periodic ingestion pipeline"""
 
 import json
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
@@ -665,6 +666,14 @@ def run_ingestion_pipeline() -> None:
 
     Uses exponential backoff for transient failures and structured logging.
     """
+    # Check if we're on Render free tier (lightweight mode)
+    if os.getenv("RENDER", "").lower() == "true":
+        logger.info("🪶 Running lightweight pipeline for Render free tier...")
+        from app.workers.lightweight_scheduler import run_lightweight_ingestion_with_timeout
+        result = run_lightweight_ingestion_with_timeout(timeout_seconds=25)
+        logger.info(f"✅ Lightweight pipeline completed: {result}")
+        return
+    
     pipeline_start = time.time()
     start_time = datetime.utcnow()
 

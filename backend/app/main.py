@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.db import check_db_health, init_db
-from app.routes import events, feeds, health
+from app.routes import events, feeds, health, test_data
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -94,6 +94,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(events.router, prefix="/events", tags=["Events"])
 app.include_router(feeds.router, prefix="/feeds", tags=["Feeds"])
+app.include_router(test_data.router, prefix="/test-data", tags=["Test Data"])
 
 
 # Root endpoint

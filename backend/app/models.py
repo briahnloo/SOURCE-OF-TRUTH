@@ -60,6 +60,8 @@ class Event(Base):
     bias_compass_json = Column(Text, nullable=True)  # JSON-encoded BiasScore
     category = Column(String(50), nullable=True, index=True)  # 'politics', 'natural_disaster', 'health', 'crime', 'international', 'other'
     category_confidence = Column(Float, nullable=True)  # 0.0-1.0 confidence in categorization
+    conflict_detected_at = Column(DateTime, nullable=True)  # When conflict first emerged
+    conflict_history_json = Column(Text, nullable=True)  # Timeline of coherence changes
     first_seen = Column(DateTime, nullable=False, index=True)
     last_seen = Column(DateTime, nullable=False)
     languages_json = Column(Text)  # JSON string: ["en", "es"]
@@ -70,8 +72,11 @@ class Event(Base):
 
     @property
     def confidence_tier(self) -> str:
-        """Get confidence tier based on truth score"""
-        if self.truth_score >= 75:
+        """Get confidence tier based on truth score and category"""
+        # Use stricter threshold for scientific events
+        threshold = 75.0 if self.category in ['natural_disaster', 'health'] else 60.0
+        
+        if self.truth_score >= threshold:
             return "confirmed"
         elif self.truth_score >= 40:
             return "developing"

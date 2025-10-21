@@ -119,11 +119,21 @@ class NarrativePerspective(BaseModel):
     representative_excerpts: Optional[List[ArticleExcerpt]] = None
 
 
+class ConflictClassification(BaseModel):
+    """Classification of conflict type"""
+    conflict_type: str  # "numerical", "attribution", "framing", "facts", "interpretation"
+    is_factual_dispute: bool
+    is_framing_difference: bool
+    confidence: float
+
+
 class ConflictExplanation(BaseModel):
     """Explains why sources present different narratives"""
     perspectives: List[NarrativePerspective]
     key_difference: str
     difference_type: str
+    classification: Optional[ConflictClassification] = None
+    keyword_overlap: Optional[float] = None  # 0-1, higher = more similar perspectives
 
 
 class BiasCompass(BaseModel):

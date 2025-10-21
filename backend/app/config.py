@@ -33,8 +33,9 @@ class Settings(BaseSettings):
         """Parse allowed origins from comma-separated string"""
         return [origin.strip() for origin in self.allowed_origins_str.split(",")]
 
-    # Scoring thresholds
-    confirmed_threshold: float = 75.0
+    # Scoring thresholds (category-specific)
+    confirmed_threshold: float = 60.0  # For politics/international
+    confirmed_threshold_scientific: float = 75.0  # For natural_disaster/health
     developing_threshold: float = 40.0
 
     # Clustering parameters
@@ -48,6 +49,17 @@ class Settings(BaseSettings):
 
     # Data retention
     article_retention_days: int = 30
+
+    # Ingestion scheduling
+    ingestion_interval_peak: int = 15  # minutes during peak hours
+    ingestion_interval_offpeak: int = 30  # minutes during off-peak hours
+    peak_hours_start: int = 6  # 6 AM (24-hour format)
+    peak_hours_end: int = 23  # 11 PM (24-hour format)
+
+    # Performance optimization
+    enable_parallel_fetching: bool = True  # fetch sources in parallel
+    max_fact_check_workers: int = 3  # concurrent fact-check workers
+    fact_check_batch_size: int = 50  # articles per run
 
     # Embedding model
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

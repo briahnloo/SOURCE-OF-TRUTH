@@ -32,6 +32,13 @@ interface Props {
 export default function UnbiasedSummary({ conflictExplanation, sources }: Props) {
     const [isExpanded, setIsExpanded] = useState(false);
 
+    const handleToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('UnbiasedSummary toggle clicked, current state:', isExpanded);
+        setIsExpanded(prev => !prev);
+    };
+
     if (!conflictExplanation) {
         return null;
     }
@@ -79,8 +86,9 @@ export default function UnbiasedSummary({ conflictExplanation, sources }: Props)
     return (
         <div className="mt-4 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
             <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full px-4 py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left"
+                onClick={handleToggle}
+                className="w-full px-4 py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left relative z-50 cursor-pointer"
+                type="button"
             >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

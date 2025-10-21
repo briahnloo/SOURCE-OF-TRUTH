@@ -17,7 +17,7 @@ export default async function ConflictsPage() {
         console.error('Error fetching conflicts:', err);
     }
 
-    // Filter out irrelevant events (natural disasters, sports, entertainment)
+    // Filter for MEANINGFUL conflicts only (backend should handle this, but double-check)
     const relevantEvents = events.filter(event => {
         // Only show events with political/social perspectives
         if (event.category === 'natural_disaster') return false;
@@ -27,6 +27,25 @@ export default async function ConflictsPage() {
         const title = event.summary?.toLowerCase() || '';
         const irrelevantKeywords = ['fanduel', 'nfl', 'betting', 'odds', 'picks', 'prediction'];
         if (irrelevantKeywords.some(kw => title.includes(kw))) return false;
+
+        // Must have multiple perspectives
+        const perspectives = event.conflict_explanation?.perspectives || [];
+        if (perspectives.length < 2) return false;
+
+        // Must have political diversity (at least 2 different leanings)
+        const politicalLeanings = new Set(
+            perspectives
+                .map((p: any) => p.political_leaning)
+                .filter(Boolean)
+        );
+
+        if (politicalLeanings.size < 2) return false;
+
+        // Must have sufficient coverage
+        if (event.articles_count < 6) return false;
+
+        // Must be medium/high severity
+        if (!event.coherence_score || event.coherence_score >= 70) return false;
 
         return true;
     });
@@ -41,15 +60,13 @@ export default async function ConflictsPage() {
                     Conflicting Narratives
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-                    Political and social events where sources present significantly different stories or interpretations
+                    US political and international conflicts where left and right sources present genuinely different narratives
                 </p>
 
-                {filteredCount > 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Showing {relevantEvents.length} events with political/social perspectives
-                        {filteredCount > 0 && ` (filtered out ${filteredCount} natural disasters and sports)`}
-                    </p>
-                )}
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Showing {relevantEvents.length} political conflicts with substantive left vs right differences
+                    {filteredCount > 0 && ` (filtered ${filteredCount} minor variations)`}
+                </p>
 
                 {/* Info Card */}
                 <div className="card bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-700 text-left max-w-3xl mx-auto">
@@ -85,8 +102,7 @@ export default async function ConflictsPage() {
                             </h3>
                             <p className="text-sm text-blue-800 dark:text-blue-300 mb-3">
                                 Each event gets a <strong>Coherence Score (0-100)</strong> that
-                                measures how much sources agree on the narrative. Events below 80 are
-                                flagged as conflicts.
+                                measures how much sources agree on the narrative. Only events with coherence below 70 AND coverage from left and right sources appear here.
                             </p>
                             <div className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
                                 <div>
@@ -107,11 +123,12 @@ export default async function ConflictsPage() {
                                     </li>
                                 </ul>
                                 <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
-                                    <strong>Conflict severity levels:</strong>
+                                    <strong>Quality filters applied:</strong>
                                     <ul className="space-y-1 ml-4 mt-1">
-                                        <li>• <strong>High (0-39)</strong> - Major disagreements</li>
-                                        <li>• <strong>Medium (40-59)</strong> - Significant differences</li>
-                                        <li>• <strong>Low (60-79)</strong> - Minor variations</li>
+                                        <li>• <strong>Politics/International only</strong> - US politics and global conflicts (Gaza, Ukraine)</li>
+                                        <li>• <strong>Left AND right coverage</strong> - True political spectrum differences</li>
+                                        <li>• <strong>Keyword overlap &lt; 40%</strong> - Perspectives say different things, not just different words</li>
+                                        <li>• <strong>6+ articles, coherence &lt; 70</strong> - Substantive disagreement patterns</li>
                                     </ul>
                                 </div>
                             </div>

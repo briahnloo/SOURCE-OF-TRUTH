@@ -1,9 +1,9 @@
 """Events API endpoints"""
 
-import json
 from typing import Optional
 
 from app.config import settings
+from app.core.json_utils import parse_json_body, parse_json_list, safe_json_loads
 from app.db import get_db
 from app.models import Article, Event
 from app.schemas import (
@@ -26,23 +26,12 @@ from app.schemas import (
     UnderreportedEvent,
     UnderreportedResponse,
 )
-from app.services.bias import BiasAnalyzer
+from app.services.service_registry import get_bias_analyzer
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 
 router = APIRouter()
-
-# Initialize bias analyzer for source lookups
-_bias_analyzer = None
-
-
-def get_bias_analyzer() -> BiasAnalyzer:
-    """Lazy load bias analyzer"""
-    global _bias_analyzer
-    if _bias_analyzer is None:
-        _bias_analyzer = BiasAnalyzer()
-    return _bias_analyzer
 
 
 def create_event_source_with_bias(article: Article) -> EventSource:
@@ -62,92 +51,6 @@ def create_event_source_with_bias(article: Article) -> EventSource:
     )
 
 
-def deserialize_conflict_explanation(
-    explanation_json: Optional[str],
-) -> Optional[ConflictExplanation]:
-    """
-    Deserialize conflict explanation JSON to ConflictExplanation object.
-
-    Args:
-        explanation_json: JSON string of conflict explanation
-
-    Returns:
-        ConflictExplanation object or None
-    """
-    if not explanation_json:
-        return None
-    
-    # Handle empty or whitespace-only strings
-    if not explanation_json.strip():
-        return None
-
-    try:
-        explanation_data = json.loads(explanation_json)
-        
-        # Validate structure
-        if not isinstance(explanation_data, dict):
-            print(f"Warning: conflict_explanation is not a dict: {type(explanation_data)}")
-            return None
-        
-        # Convert perspective dicts to NarrativePerspective objects
-        perspectives = []
-        for p in explanation_data.get("perspectives", []):
-            try:
-                perspectives.append(NarrativePerspective(**p))
-            except Exception as e:
-                print(f"Warning: Failed to parse perspective: {e}, data: {p}")
-                continue
-        
-        if not perspectives:
-            return None
-        
-        return ConflictExplanation(
-            perspectives=perspectives,
-            key_difference=explanation_data.get("key_difference", ""),
-            difference_type=explanation_data.get("difference_type", ""),
-        )
-    except json.JSONDecodeError as e:
-        print(f"Warning: Invalid JSON in conflict_explanation: {e}")
-        print(f"  Content preview: {explanation_json[:100]}")
-        return None
-    except Exception as e:
-        print(f"Warning: Failed to deserialize conflict explanation: {e}")
-        return None
-
-
-def deserialize_bias_compass(bias_json: Optional[str]) -> Optional[BiasCompass]:
-    """
-    Deserialize bias compass JSON to BiasCompass object.
-
-    Args:
-        bias_json: JSON string of bias compass
-
-    Returns:
-        BiasCompass object or None
-    """
-    if not bias_json:
-        return None
-    
-    # Handle empty or whitespace-only strings
-    if not bias_json.strip():
-        return None
-
-    try:
-        bias_data = json.loads(bias_json)
-        
-        # Validate structure
-        if not isinstance(bias_data, dict):
-            print(f"Warning: bias_compass is not a dict: {type(bias_data)}")
-            return None
-        
-        return BiasCompass(**bias_data)
-    except json.JSONDecodeError as e:
-        print(f"Warning: Invalid JSON in bias_compass: {e}")
-        print(f"  Content preview: {bias_json[:100]}")
-        return None
-    except Exception as e:
-        print(f"Warning: Failed to deserialize bias compass: {e}")
-        return None
 
 
 @router.get("", response_model=EventsResponse)
@@ -169,14 +72,42 @@ async def get_events(
     """
     query = db.query(Event)
 
-    # Apply status filter
+    # Apply status filter with category-specific thresholds
     if status == "confirmed":
-        query = query.filter(Event.truth_score >= settings.confirmed_threshold)
+        # Category-specific confirmed threshold
+        query = query.filter(
+            or_(
+                and_(
+                    Event.category.in_(['natural_disaster', 'health']),
+                    Event.truth_score >= settings.confirmed_threshold_scientific
+                ),
+                and_(
+                    or_(
+                        Event.category.in_(['politics', 'international', 'crime', 'other']),
+                        Event.category == None
+                    ),
+                    Event.truth_score >= settings.confirmed_threshold
+                )
+            )
+        )
     elif status == "developing":
+        # Developing: between 40 and category-specific confirmed threshold
         query = query.filter(
             and_(
                 Event.truth_score >= settings.developing_threshold,
-                Event.truth_score < settings.confirmed_threshold,
+                or_(
+                    and_(
+                        Event.category.in_(['natural_disaster', 'health']),
+                        Event.truth_score < settings.confirmed_threshold_scientific
+                    ),
+                    and_(
+                        or_(
+                            Event.category.in_(['politics', 'international', 'crime', 'other']),
+                            Event.category == None
+                        ),
+                        Event.truth_score < settings.confirmed_threshold
+                    )
+                )
             )
         )
     else:  # all
@@ -208,13 +139,13 @@ async def get_events(
         )
         sources = [create_event_source_with_bias(a) for a in articles]
 
-        # Deserialize conflict explanation if present
-        conflict_explanation = deserialize_conflict_explanation(
-            event.conflict_explanation_json
+        # Deserialize conflict explanation and bias compass
+        conflict_explanation = parse_json_body(
+            event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
         )
-
-        # Deserialize bias compass if present
-        bias_compass = deserialize_bias_compass(event.bias_compass_json)
+        bias_compass = parse_json_body(
+            event.bias_compass_json, BiasCompass, "bias_compass"
+        )
 
         event_dict = {
             "id": event.id,
@@ -297,48 +228,126 @@ async def get_conflict_events(
     db: Session = Depends(get_db),
 ):
     """
-    Get events with narrative conflicts (coherence < 80).
-
-    These are events where sources present significantly different stories.
-    Only includes political and social events (filters out natural disasters, sports).
+    Get events with MEANINGFUL political narrative conflicts.
+    
+    ONLY includes:
+    - US politics
+    - International conflicts (Gaza, Ukraine, etc.)
+    
+    Requirements:
+    - Coherence < 70 (medium or high severity)
+    - At least 6 articles from 4+ sources
+    - Left AND right coverage
+    - Keyword overlap < 40% (genuine differences, not just headline variations)
     """
-    # Filter for conflicts, excluding natural disasters and irrelevant categories
+    # Filter for POLITICAL conflicts only
     query = (
         db.query(Event)
         .filter(Event.has_conflict == True)
+        .filter(Event.coherence_score < 70)  # Medium or high severity
+        .filter(Event.articles_count >= 6)    # Minimum coverage
+        .filter(Event.unique_sources >= 4)    # Source diversity
+        .filter(Event.conflict_explanation_json != None)  # Has perspectives
         .filter(
-            (Event.category != 'natural_disaster') | (Event.category == None)
+            # ONLY politics and international (or NULL for uncategorized)
+            (Event.category.in_(['politics', 'international'])) | (Event.category == None)
         )
     )
 
-    total = query.count()
+    total_candidates = query.count()
 
+    # Get more events than needed to filter for political diversity
     events = (
-        query.order_by(Event.coherence_score.asc(), Event.first_seen.desc())
-        .limit(limit)
+        query.order_by(Event.last_seen.desc())
+        .limit(limit * 3)  # Get 3x to account for filtering
         .offset(offset)
         .all()
     )
 
-    # Build response with sources
+    # ADDITIONAL FILTER: Check for political diversity in results
     results = []
     for event in events:
         articles = (
             db.query(Article)
             .filter(Article.cluster_id == event.id)
-            .limit(10)  # Top 10 sources
+            .limit(10)
             .all()
         )
-        sources = [create_event_source_with_bias(a) for a in articles]
-
-        # Deserialize conflict explanation if present
-        conflict_explanation = deserialize_conflict_explanation(
-            event.conflict_explanation_json
+        
+        # Filter out non-political topics by content (regardless of category)
+        summary_lower = event.summary.lower()
+        skip_event = False
+        
+        # Foreign elections (not US politics)
+        foreign_election_patterns = [
+            ('japan', 'prime minister'),
+            ('japan', 'pm'),
+            ('bolivia', 'president'),
+            ('bolivia', 'election'),
+        ]
+        is_foreign_election = any(
+            all(kw in summary_lower for kw in pattern) 
+            for pattern in foreign_election_patterns
         )
-
-        # Deserialize bias compass if present
-        bias_compass = deserialize_bias_compass(event.bias_compass_json)
-
+        if is_foreign_election:
+            continue  # Skip - foreign election, not US politics
+        
+        # Non-political topics
+        non_political_topics = [
+            'louvre', 'museum heist', 'jewelry',
+            'aws outage', 'amazon', 'internet outage',
+            'nfl', 'sports', 'playoffs',
+        ]
+        if any(topic in summary_lower for topic in non_political_topics):
+            continue  # Skip - not political
+        
+        # Parse conflict explanation
+        conflict_explanation = parse_json_body(
+            event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
+        )
+        
+        # Skip if no real political diversity in perspectives
+        if conflict_explanation:
+            perspectives = conflict_explanation.perspectives
+            political_leanings = set()
+            
+            # Extract political leanings from perspectives
+            for p in perspectives:
+                # Perspectives are NarrativePerspective objects
+                if hasattr(p, 'political_leaning') and p.political_leaning:
+                    political_leanings.add(p.political_leaning)
+            
+            # Require at least 2 different political leanings
+            if len(political_leanings) < 2:
+                continue  # Skip - not politically diverse
+            
+            # REQUIRE left AND right coverage for true conflict
+            if 'left' not in political_leanings or 'right' not in political_leanings:
+                # Only show if coherence is VERY low (major disagreement)
+                if event.coherence_score >= 40:
+                    continue  # Skip - not severe enough without left+right
+            
+            # Check keyword overlap - CRITICAL FILTER
+            # Note: keyword_overlap may be None for older events (not yet recalculated)
+            keyword_overlap = conflict_explanation.keyword_overlap
+            if keyword_overlap is not None and keyword_overlap >= 0.40:
+                # 40%+ overlap = same story
+                continue  # Skip - perspectives too similar
+            
+            # Check classification if available
+            classification = conflict_explanation.classification
+            if classification:
+                # Classification is a Pydantic object
+                if (classification.conflict_type == 'interpretation' and 
+                    classification.confidence < 0.6):
+                    continue  # Skip - not meaningful difference
+        else:
+            continue  # Skip events without explanation
+        
+        # Event passes filters - include it
+        sources = [create_event_source_with_bias(a) for a in articles]
+        bias_compass = parse_json_body(event.bias_compass_json, BiasCompass, "bias_compass")
+        
         event_dict = {
             "id": event.id,
             "summary": event.summary,
@@ -357,8 +366,12 @@ async def get_conflict_events(
             "sources": sources,
         }
         results.append(EventList(**event_dict))
-
-    return EventsResponse(total=total, limit=limit, offset=offset, results=results)
+        
+        # Stop if we have enough results
+        if len(results) >= limit:
+            break
+    
+    return EventsResponse(total=len(results), limit=limit, offset=offset, results=results)
 
 
 @router.get("/stats/summary", response_model=StatsResponse)
@@ -501,14 +514,10 @@ async def get_flagged_articles(
     flagged_articles = []
     for article in articles:
         # Deserialize fact-check flags
-        flags = []
-        if article.fact_check_flags_json:
-            try:
-                flags_data = json.loads(article.fact_check_flags_json)
-                flags = [FactCheckFlag(**f) for f in flags_data]
-            except Exception as e:
-                print(f"Warning: Failed to deserialize flags for article {article.id}: {e}")
-        
+        flags = parse_json_list(
+            article.fact_check_flags_json, FactCheckFlag, "fact_check_flags"
+        )
+
         flagged_articles.append(
             FlaggedArticle(
                 id=article.id,
@@ -562,16 +571,11 @@ async def get_event_detail(event_id: int, db: Session = Depends(get_db)):
 
     articles_detail = []
     for a in articles:
-        entities = json.loads(a.entities_json) if a.entities_json else []
-
-        # Deserialize fact-check flags
-        fact_check_flags = None
-        if a.fact_check_flags_json:
-            try:
-                flags_data = json.loads(a.fact_check_flags_json)
-                fact_check_flags = [FactCheckFlag(**f) for f in flags_data]
-            except Exception as e:
-                print(f"Warning: Failed to deserialize fact-check flags: {e}")
+        # Deserialize entities and fact-check flags
+        entities = safe_json_loads(a.entities_json, default=[])
+        fact_check_flags = parse_json_list(
+            a.fact_check_flags_json, FactCheckFlag, "fact_check_flags"
+        )
 
         articles_detail.append(
             ArticleDetail(
@@ -622,13 +626,14 @@ async def get_event_detail(event_id: int, db: Session = Depends(get_db)):
         },
     )
 
-    languages = json.loads(event.languages_json) if event.languages_json else []
-
-    # Deserialize conflict explanation if present
-    conflict_explanation = deserialize_conflict_explanation(event.conflict_explanation_json)
-
-    # Deserialize bias compass if present
-    bias_compass = deserialize_bias_compass(event.bias_compass_json)
+    # Deserialize languages, conflict explanation, and bias compass
+    languages = safe_json_loads(event.languages_json, default=[])
+    conflict_explanation = parse_json_body(
+        event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
+    )
+    bias_compass = parse_json_body(
+        event.bias_compass_json, BiasCompass, "bias_compass"
+    )
 
     return EventDetail(
         id=event.id,

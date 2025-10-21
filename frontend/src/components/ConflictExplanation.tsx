@@ -49,7 +49,18 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
     const [expandedPerspectives, setExpandedPerspectives] = useState<Set<number>>(new Set());
     const [isMainExpanded, setIsMainExpanded] = useState(true); // Default to expanded
 
-    const toggleExpanded = (index: number) => {
+    const toggleMain = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('ConflictExplanation main toggle clicked, current state:', isMainExpanded);
+        setIsMainExpanded(prev => !prev);
+    };
+
+    const toggleExpanded = (index: number, e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         const newExpanded = new Set(expandedPerspectives);
         if (newExpanded.has(index)) {
             newExpanded.delete(index);
@@ -152,8 +163,9 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
     return (
         <div className="mt-4">
             <button
-                onClick={() => setIsMainExpanded(!isMainExpanded)}
-                className="w-full text-left px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/30 dark:hover:to-purple-900/30 transition-colors rounded-lg border border-blue-200 dark:border-blue-800"
+                onClick={toggleMain}
+                className="w-full text-left px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/30 dark:hover:to-purple-900/30 transition-colors rounded-lg border border-blue-200 dark:border-blue-800 relative z-50 cursor-pointer"
+                type="button"
             >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -422,8 +434,9 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                                 return remainingCount > 0 && (
                                                     <>
                                                         <button
-                                                            onClick={() => toggleExpanded(idx)}
-                                                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                                                            onClick={(e) => toggleExpanded(idx, e)}
+                                                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors flex items-center gap-1 relative z-50 cursor-pointer"
+                                                            type="button"
                                                         >
                                                             {expandedPerspectives.has(idx) ? (
                                                                 <>

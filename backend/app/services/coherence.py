@@ -16,23 +16,14 @@ import spacy
 from openai import OpenAI
 from app.models import Article
 from app.services.content_fetcher import ContentFetcher
+from app.services.service_registry import get_nlp_model, get_bias_analyzer
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Load spaCy model (lazy load)
-_nlp = None
-
 
 def get_nlp():
-    """Lazy load spaCy model"""
-    global _nlp
-    if _nlp is None:
-        try:
-            _nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            print("Warning: spaCy model not found. Entity extraction will be limited.")
-            _nlp = None
-    return _nlp
+    """Get the singleton spaCy NLP model instance"""
+    return get_nlp_model()
 
 
 @dataclass
@@ -67,12 +58,23 @@ class NumericDiscrepancy:
 
 
 @dataclass
+class ConflictClassification:
+    """Classify the nature of a conflict"""
+    conflict_type: str  # "numerical", "attribution", "framing", "facts", "interpretation"
+    is_factual_dispute: bool  # True if claims contradict facts
+    is_framing_difference: bool  # True if same facts, different spin
+    confidence: float  # How certain we are about classification
+
+
+@dataclass
 class ConflictExplanation:
     """Explains why sources present different narratives"""
     perspectives: List[dict]  # List of NarrativePerspective as dicts
     key_difference: str
     difference_type: str  # "emphasis", "facts", "interpretation", "framing"
     numeric_discrepancies: Optional[List[dict]] = None  # List of NumericDiscrepancy as dicts
+    classification: Optional[dict] = None  # ConflictClassification as dict
+    keyword_overlap: Optional[float] = None  # 0-1, higher = more similar perspectives
 
 
 def calculate_narrative_coherence(
@@ -109,6 +111,23 @@ def calculate_narrative_coherence(
 
     # Determine conflict severity
     severity = determine_conflict_severity(coherence)
+
+    # CRITICAL: Only flag as conflict if politically diverse
+    if severity != "none":
+        # Check if we have left AND right coverage
+        politically_diverse = has_political_diversity(articles)
+        
+        # If not politically diverse, downgrade severity
+        if not politically_diverse:
+            # Events without left+right coverage are NOT true conflicts
+            if len(articles) < 8:
+                # Small events without political diversity = no conflict
+                severity = "none"
+            elif coherence < 40:
+                # Only flag single-perspective events if coherence is VERY low
+                severity = "low"
+            else:
+                severity = "none"
 
     # If conflict detected, generate explanation
     explanation = None
@@ -293,6 +312,8 @@ def calculate_title_consistency(articles: List[Article]) -> float:
 def determine_conflict_severity(coherence_score: float) -> str:
     """
     Determine conflict severity based on coherence score.
+    
+    Stricter thresholds to avoid flagging minor title variations as conflicts.
 
     Args:
         coherence_score: 0-100
@@ -300,11 +321,11 @@ def determine_conflict_severity(coherence_score: float) -> str:
     Returns:
         'none', 'low', 'medium', or 'high'
     """
-    if coherence_score >= 80:
+    if coherence_score >= 90:  # Raised from 80
         return "none"  # High coherence, no conflict
-    elif coherence_score >= 60:
+    elif coherence_score >= 70:  # Raised from 60
         return "low"  # Moderate coherence, minor differences
-    elif coherence_score >= 40:
+    elif coherence_score >= 50:  # Raised from 40
         return "medium"  # Low coherence, significant differences
     else:
         return "high"  # Very low coherence, major conflict
@@ -313,17 +334,15 @@ def determine_conflict_severity(coherence_score: float) -> str:
 def has_political_diversity(articles: List[Article]) -> bool:
     """
     Check if articles come from sources across the political spectrum.
-    
+
     Args:
         articles: List of articles
-        
+
     Returns:
         True if sources span left and right, False otherwise
     """
     try:
-        from app.services.bias import BiasAnalyzer
-        
-        bias_analyzer = BiasAnalyzer()
+        bias_analyzer = get_bias_analyzer()
         
         has_left = False
         has_right = False
@@ -348,19 +367,17 @@ def has_political_diversity(articles: List[Article]) -> bool:
 def group_by_political_bias(articles: List[Article]) -> Tuple[List[NarrativePerspective], List[List[Article]]]:
     """
     Group articles by the political leaning of their source.
-    
+
     Creates three groups: Left, Center, Right based on source bias classifications.
-    
+
     Args:
         articles: List of articles
-        
+
     Returns:
         Tuple of (perspectives, articles_by_perspective)
     """
     try:
-        from app.services.bias import BiasAnalyzer
-        
-        bias_analyzer = BiasAnalyzer()
+        bias_analyzer = get_bias_analyzer()
         
         # Group articles by political leaning
         left_articles = []
@@ -517,8 +534,8 @@ def analyze_perspective_group(articles: List[Article]) -> NarrativePerspective:
     entity_counts = Counter(all_entities)
     key_entities = [e for e, _ in entity_counts.most_common(5)]
 
-    # Determine sentiment
-    sentiment = determine_group_sentiment(articles)
+    # Determine sentiment using LLM (with fallback to keyword-based)
+    sentiment = determine_group_sentiment_llm(articles)
 
     # Extract source domains (deduplicate)
     sources = []
@@ -672,6 +689,61 @@ def extract_distinctive_keywords(articles: List[Article]) -> List[str]:
     keywords = [w for w, _ in word_counts.most_common(5)]
 
     return keywords
+
+
+def determine_group_sentiment_llm(articles: List[Article]) -> str:
+    """
+    Use LLM to accurately determine sentiment (positive/negative/neutral).
+    
+    Only called for political conflicts, so minimal API usage.
+    
+    Args:
+        articles: List of articles
+        
+    Returns:
+        'positive', 'negative', or 'neutral'
+    """
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if not openai_key:
+        return determine_group_sentiment(articles)  # Fallback to keyword-based
+    
+    try:
+        client = OpenAI(api_key=openai_key)
+        
+        # Combine titles for analysis
+        titles = "\n".join([f"- {a.title}" for a in articles[:5]])
+        
+        prompt = f"""Analyze the overall sentiment/tone of these news headlines:
+
+{titles}
+
+Is the overall tone:
+- positive (celebratory, optimistic, favorable)
+- negative (critical, pessimistic, unfavorable)
+- neutral (factual, balanced)
+
+Respond with ONE WORD only: positive, negative, or neutral"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Cheaper model for simple task
+            messages=[
+                {"role": "system", "content": "You analyze news sentiment. Respond with exactly one word."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=10,
+        )
+        
+        sentiment = response.choices[0].message.content.strip().lower()
+        
+        if sentiment in ['positive', 'negative', 'neutral']:
+            return sentiment
+        else:
+            return "neutral"
+            
+    except Exception as e:
+        print(f"LLM sentiment failed: {e}")
+        return determine_group_sentiment(articles)  # Fallback
 
 
 def determine_group_sentiment(articles: List[Article]) -> str:
@@ -907,6 +979,7 @@ Return ONLY valid JSON in this exact format:
 def generate_conflict_explanation(
     perspectives: List[NarrativePerspective],
     articles_by_perspective: Optional[List[List[Article]]] = None,
+    force_excerpt_extraction: bool = False,
 ) -> ConflictExplanation:
     """
     Generate human-readable explanation of why sources conflict.
@@ -932,36 +1005,47 @@ def generate_conflict_explanation(
             print(f"Warning: Failed to detect numeric discrepancies: {e}")
 
     # Extract excerpts if articles provided
+    # Now also extracts for developing events even without major conflicts
     if articles_by_perspective and len(articles_by_perspective) == len(perspectives):
-        for i, (perspective, articles) in enumerate(zip(perspectives, articles_by_perspective)):
-            try:
-                # Prepare context for this perspective
-                perspective_context = f"{perspective.representative_title} (focuses on: {', '.join(perspective.focus_keywords[:3])})"
-                
-                # Prepare other perspectives for contrast
-                other_perspectives = [
-                    f"{p.representative_title} (focuses on: {', '.join(p.focus_keywords[:3])})"
-                    for j, p in enumerate(perspectives) if j != i
-                ]
-                
-                # Extract excerpts
-                excerpts = extract_differentiating_excerpts(
-                    articles=articles,
-                    perspective_context=perspective_context,
-                    other_perspectives=other_perspectives,
-                    political_leaning=perspective.political_leaning,
-                    max_excerpts=2,
-                )
-                
-                # Convert excerpts to dicts and store
-                if excerpts:
-                    perspective.representative_excerpts = [asdict(e) for e in excerpts]
-            except Exception as e:
-                print(f"Warning: Failed to extract excerpts for perspective {i}: {e}")
-                import traceback
-                traceback.print_exc()
-                continue
+        # Always extract if forced OR if multiple perspectives exist
+        should_extract = force_excerpt_extraction or len(perspectives) > 1
+        
+        if should_extract:
+            for i, (perspective, articles) in enumerate(zip(perspectives, articles_by_perspective)):
+                try:
+                    # Prepare context for this perspective
+                    perspective_context = f"{perspective.representative_title} (focuses on: {', '.join(perspective.focus_keywords[:3])})"
+                    
+                    # Prepare other perspectives for contrast
+                    other_perspectives = [
+                        f"{p.representative_title} (focuses on: {', '.join(p.focus_keywords[:3])})"
+                        for j, p in enumerate(perspectives) if j != i
+                    ]
+                    
+                    # Extract excerpts
+                    excerpts = extract_differentiating_excerpts(
+                        articles=articles,
+                        perspective_context=perspective_context,
+                        other_perspectives=other_perspectives,
+                        political_leaning=perspective.political_leaning,
+                        max_excerpts=2,
+                    )
+                    
+                    # Convert excerpts to dicts and store
+                    if excerpts:
+                        perspective.representative_excerpts = [asdict(e) for e in excerpts]
+                except Exception as e:
+                    print(f"Warning: Failed to extract excerpts for perspective {i}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
 
+    # Calculate keyword overlap between perspectives
+    keyword_overlap = calculate_keyword_overlap(perspectives)
+    
+    # Classify the type of conflict
+    classification = classify_conflict_type(perspectives, numeric_discrepancies)
+    
     # Convert perspectives to dicts for JSON serialization
     perspective_dicts = [asdict(p) for p in perspectives]
     
@@ -973,6 +1057,8 @@ def generate_conflict_explanation(
         key_difference=key_diff,
         difference_type=difference_type,
         numeric_discrepancies=discrepancy_dicts,
+        classification=asdict(classification),
+        keyword_overlap=keyword_overlap,
     )
 
 
@@ -1119,6 +1205,99 @@ def detect_numeric_discrepancies(
                     discrepancies.append(discrepancy)
     
     return discrepancies
+
+
+def calculate_keyword_overlap(perspectives: List[NarrativePerspective]) -> float:
+    """
+    Calculate how much perspectives' focus keywords overlap.
+    
+    High overlap (> 40%) = same story, different words
+    Low overlap (< 40%) = genuinely different angles
+    
+    Args:
+        perspectives: List of narrative perspectives
+        
+    Returns:
+        Overlap ratio 0-1 (0 = no overlap, 1 = identical)
+    """
+    if len(perspectives) < 2:
+        return 1.0
+    
+    # Get keyword sets for each perspective
+    keyword_sets = [set(p.focus_keywords) for p in perspectives]
+    
+    # Calculate pairwise Jaccard similarity
+    overlaps = []
+    for i in range(len(keyword_sets)):
+        for j in range(i + 1, len(keyword_sets)):
+            intersection = keyword_sets[i] & keyword_sets[j]
+            union = keyword_sets[i] | keyword_sets[j]
+            
+            if len(union) > 0:
+                overlap = len(intersection) / len(union)
+                overlaps.append(overlap)
+    
+    # Return average overlap
+    return float(np.mean(overlaps)) if overlaps else 0.0
+
+
+def classify_conflict_type(
+    perspectives: List[NarrativePerspective], 
+    numeric_discrepancies: List[NumericDiscrepancy]
+) -> ConflictClassification:
+    """
+    Determine what KIND of conflict this is.
+    
+    Args:
+        perspectives: List of narrative perspectives
+        numeric_discrepancies: List of numerical differences detected
+        
+    Returns:
+        ConflictClassification with type and confidence
+    """
+    # Check for numerical discrepancies
+    if numeric_discrepancies:
+        high_severity_nums = [d for d in numeric_discrepancies if d.significance == "high"]
+        if high_severity_nums:
+            return ConflictClassification(
+                conflict_type="numerical",
+                is_factual_dispute=True,
+                is_framing_difference=False,
+                confidence=0.9
+            )
+    
+    # Check entity overlap - low overlap = factual dispute
+    entity_sets = [set(p.key_entities) for p in perspectives]
+    if len(entity_sets) >= 2:
+        intersection = set.intersection(*entity_sets) if entity_sets else set()
+        union = set.union(*entity_sets) if entity_sets else set()
+        overlap = len(intersection) / len(union) if len(union) > 0 else 1.0
+        
+        if overlap < 0.3:
+            return ConflictClassification(
+                conflict_type="facts",
+                is_factual_dispute=True,
+                is_framing_difference=False,
+                confidence=0.7
+            )
+    
+    # Check sentiment - different sentiment = framing
+    sentiments = set(p.sentiment for p in perspectives)
+    if len(sentiments) > 1:
+        return ConflictClassification(
+            conflict_type="framing",
+            is_factual_dispute=False,
+            is_framing_difference=True,
+            confidence=0.6
+        )
+    
+    # Default to interpretation
+    return ConflictClassification(
+        conflict_type="interpretation",
+        is_factual_dispute=False,
+        is_framing_difference=True,
+        confidence=0.5
+    )
 
 
 def identify_key_difference(

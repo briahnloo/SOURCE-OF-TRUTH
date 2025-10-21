@@ -97,8 +97,8 @@ export default function QuickCompare({ explanation, onExpand }: Props) {
 
                     {/* Quick Perspective Summaries */}
                     {explanation.perspectives.map((perspective, idx) => {
-                        const firstExcerpt = (perspective as any).representative_excerpts && (perspective as any).representative_excerpts.length > 0 
-                            ? (perspective as any).representative_excerpts[0] 
+                        const firstExcerpt = (perspective as any).representative_excerpts && (perspective as any).representative_excerpts.length > 0
+                            ? (perspective as any).representative_excerpts[0]
                             : null;
                         const firstSource = perspective.sources[0];
 
@@ -129,17 +129,22 @@ export default function QuickCompare({ explanation, onExpand }: Props) {
                                         ))}
                                     </p>
 
-                                    {/* Article preview link */}
+                                    {/* Show excerpt preview inline */}
                                     {firstExcerpt && (
-                                        <a
-                                            href={firstExcerpt.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-start gap-1"
-                                        >
-                                            <span className="font-semibold">[{firstSource}]</span>
-                                            <span className="line-clamp-2">{firstExcerpt.title}</span>
-                                        </a>
+                                        <div className="mt-2">
+                                            <blockquote className="text-xs text-gray-600 dark:text-gray-400 italic border-l-2 border-gray-300 dark:border-gray-600 pl-2 line-clamp-3">
+                                                &quot;{firstExcerpt.excerpt}&quot;
+                                            </blockquote>
+                                            <a
+                                                href={firstExcerpt.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-flex items-center gap-1"
+                                            >
+                                                <span>Read full article from {firstSource}</span>
+                                                <span>↗</span>
+                                            </a>
+                                        </div>
                                     )}
                                 </div>
                             </div>

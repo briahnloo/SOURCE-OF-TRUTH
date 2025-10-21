@@ -7,6 +7,17 @@ from app.config import settings
 from app.models import Article, Event
 from sqlalchemy.orm import Session
 
+# Trusted news sources for political event verification
+TRUSTED_NEWS_SOURCES = [
+    'apnews.com', 'ap.org',
+    'reuters.com',
+    'bbc.com', 'bbc.co.uk', 'feeds.bbci.co.uk',
+    'nytimes.com',
+    'afp.com',
+    'npr.org', 'feeds.npr.org',
+    'pbs.org',
+]
+
 
 def calculate_source_score(unique_sources: int) -> float:
     """
@@ -41,6 +52,7 @@ def calculate_official_match_score(event: Event, db: Session) -> float:
     Calculate official match score (0-15 points).
 
     Checks temporal proximity to official data feed events.
+    Used for natural disasters and health events.
     """
     # Get official source articles in the event
     articles = db.query(Article).filter(Article.cluster_id == event.id).all()
@@ -58,15 +70,78 @@ def calculate_official_match_score(event: Event, db: Session) -> float:
     return 15.0
 
 
+def calculate_coherence_bonus(event: Event) -> float:
+    """
+    Bonus for narrative coherence (0-15 points).
+    
+    Replaces official_match for political events where sources
+    agreeing strongly indicates truth.
+    
+    Args:
+        event: Event to score
+        
+    Returns:
+        Coherence bonus (0-15)
+    """
+    coherence = event.coherence_score or 0
+    
+    # Only give bonus for HIGH coherence (sources agree strongly)
+    if coherence >= 90:
+        return 15.0  # Perfect agreement
+    elif coherence >= 80:
+        return 10.0  # Strong agreement
+    elif coherence >= 70:
+        return 5.0   # Moderate agreement
+    else:
+        return 0.0  # Low coherence = conflicting narratives
+
+
+def calculate_trusted_source_bonus(event: Event, db: Session) -> float:
+    """
+    Bonus for trusted primary news sources (0-15 points).
+    
+    Replaces evidence_score for political events.
+    Wire services (AP, Reuters, AFP) and major broadcasters
+    (BBC, NPR, PBS) serve as verification for political news.
+    
+    Args:
+        event: Event to score
+        db: Database session
+        
+    Returns:
+        Trusted source bonus (0-15)
+    """
+    articles = db.query(Article).filter(Article.cluster_id == event.id).all()
+    
+    trusted_count = 0
+    for article in articles:
+        source_lower = article.source.lower()
+        if any(trusted in source_lower for trusted in TRUSTED_NEWS_SOURCES):
+            trusted_count += 1
+    
+    # Scaling: 1 = 5pts, 2 = 10pts, 3+ = 15pts
+    if trusted_count >= 3:
+        return 15.0
+    elif trusted_count == 2:
+        return 10.0
+    elif trusted_count == 1:
+        return 5.0
+    else:
+        return 0.0
+
+
 def score_event(event: Event, db: Session) -> float:
     """
-    Calculate truth confidence score for an event.
-
-    Formula:
-        truth_score = (source_score * 0.25) +
-                      (geo_score * 0.40) +
-                      (evidence_score * 0.20) +
-                      (official_score * 0.15)
+    Calculate truth confidence score with category-specific scoring.
+    
+    Natural disasters/health:
+        - Use official sources (USGS, WHO, NASA)
+        - Threshold: 75
+    
+    Political/international:
+        - Use trusted news sources (AP, Reuters, BBC)
+        - Use coherence bonus (sources agreeing)
+        - Threshold: 60
 
     Args:
         event: Event to score
@@ -77,9 +152,17 @@ def score_event(event: Event, db: Session) -> float:
     """
     source_score = calculate_source_score(event.unique_sources)
     geo_score = calculate_geo_score(event.geo_diversity or 0.0)
-    evidence_score = calculate_evidence_score(event.evidence_flag)
-    official_score = calculate_official_match_score(event, db)
-
+    
+    # Category-specific scoring
+    if event.category in ['natural_disaster', 'health']:
+        # Use official sources for scientific events
+        evidence_score = calculate_evidence_score(event.evidence_flag)
+        official_score = calculate_official_match_score(event, db)
+    else:
+        # Use trusted news sources for political events
+        evidence_score = calculate_trusted_source_bonus(event, db)
+        official_score = calculate_coherence_bonus(event)
+    
     # Set official_match flag
     event.official_match = official_score > 0
 

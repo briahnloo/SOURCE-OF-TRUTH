@@ -4,18 +4,14 @@
 
 // Use environment variable for production, localhost for development
 function getApiUrl(): string {
-    // In production, NEXT_PUBLIC_API_URL will be set to the Render backend URL
-    if (process.env.NEXT_PUBLIC_API_URL) {
-        return process.env.NEXT_PUBLIC_API_URL;
+    // Server-side rendering: use internal Docker service name
+    if (typeof window === 'undefined') {
+        // Use INTERNAL_API_URL for server-side (Docker service name)
+        return process.env.INTERNAL_API_URL || 'http://backend:8000';
     }
 
-    // Development fallback
-    if (typeof window === 'undefined') {
-        // Server-side: use 127.0.0.1 (localhost sometimes fails in Node.js SSR)
-        return 'http://127.0.0.1:8000';
-    }
-    // Client-side: use localhost
-    return 'http://localhost:8000';
+    // Client-side: use public API URL or localhost
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 }
 
 export interface EventSource {
@@ -201,7 +197,6 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
     try {
         const response = await fetch(url, {
             cache: 'no-store',  // Disable Next.js caching for dynamic data
-            next: { revalidate: 0 }  // Always fetch fresh data
         });
 
         if (!response.ok) {

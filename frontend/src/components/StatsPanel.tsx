@@ -11,6 +11,9 @@ function AnimatedNumber({ value }: { value: number }) {
     const [count, setCount] = useState(0);
 
     useEffect(() => {
+        // Reset count when value changes
+        setCount(0);
+
         const duration = 1000;
         const steps = 30;
         const increment = value / steps;
@@ -43,7 +46,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Total Events
                         </div>
                         <div className="mt-2 text-4xl font-bold text-gray-900 dark:text-white">
-                            <AnimatedNumber value={stats.total_events} />
+                            <span className="tabular-nums">{stats.total_events.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">📊</div>
@@ -58,7 +61,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Confirmed
                         </div>
                         <div className="mt-2 text-4xl font-bold text-confirmed-dark dark:text-confirmed-light">
-                            <AnimatedNumber value={stats.confirmed_events} />
+                            <span className="tabular-nums">{stats.confirmed_events.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl">✓</div>
@@ -73,7 +76,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Developing
                         </div>
                         <div className="mt-2 text-4xl font-bold text-developing-dark dark:text-developing-light">
-                            <AnimatedNumber value={stats.developing_events} />
+                            <span className="tabular-nums">{stats.developing_events.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl">🔄</div>
@@ -88,7 +91,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Underreported
                         </div>
                         <div className="mt-2 text-4xl font-bold text-underreported-dark dark:text-underreported-light">
-                            <AnimatedNumber value={stats.underreported_events} />
+                            <span className="tabular-nums">{stats.underreported_events.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl">📢</div>
@@ -103,7 +106,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Conflicting Narratives
                         </div>
                         <div className="mt-2 text-4xl font-bold text-yellow-700 dark:text-yellow-400">
-                            <AnimatedNumber value={stats.conflict_events} />
+                            <span className="tabular-nums">{stats.conflict_events.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl">⚠️</div>
@@ -148,7 +151,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Total Articles
                         </div>
                         <div className="mt-2 text-4xl font-bold text-gray-900 dark:text-white">
-                            <AnimatedNumber value={stats.total_articles} />
+                            <span className="tabular-nums">{stats.total_articles.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">📰</div>
@@ -163,7 +166,7 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                             Unique Sources
                         </div>
                         <div className="mt-2 text-4xl font-bold text-gray-900 dark:text-white">
-                            <AnimatedNumber value={stats.sources_count} />
+                            <span className="tabular-nums">{stats.sources_count.toLocaleString()}</span>
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">🔗</div>

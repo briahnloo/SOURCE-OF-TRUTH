@@ -3,21 +3,12 @@
 from typing import List
 
 import numpy as np
-from app.config import settings
-from sentence_transformers import SentenceTransformer
-
-# Lazy load model
-_model = None
+from app.services.service_registry import get_embedding_model
 
 
-def get_model() -> SentenceTransformer:
-    """Lazy load sentence-transformers model"""
-    global _model
-    if _model is None:
-        print(f"Loading embedding model: {settings.embedding_model}")
-        _model = SentenceTransformer(settings.embedding_model)
-        print("✅ Embedding model loaded")
-    return _model
+def get_model():
+    """Get the singleton embedding model instance"""
+    return get_embedding_model()
 
 
 def generate_embeddings(texts: List[str]) -> np.ndarray:

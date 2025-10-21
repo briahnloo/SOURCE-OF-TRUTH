@@ -11,40 +11,13 @@ from app.config import settings
 from app.models import Article
 from sqlalchemy.orm import Session
 
-# Load spaCy model (lazy loading)
-_nlp = None
-
-# Load fact-checker (lazy loading)
-_fact_checker = None
-
-
-def get_fact_checker():
-    """Lazy load fact checker"""
-    global _fact_checker
-    if _fact_checker is None:
-        try:
-            from app.services.fact_check import FactChecker
-
-            _fact_checker = FactChecker()
-        except Exception as e:
-            print(f"Warning: Could not load fact checker: {e}")
-            _fact_checker = None
-    return _fact_checker
+import spacy
+from app.services.service_registry import get_nlp_model, get_fact_checker
 
 
 def get_nlp():
-    """Lazy load spaCy model"""
-    global _nlp
-    if _nlp is None:
-        try:
-            _nlp = spacy.load("en_core_web_sm")
-        except:
-            print("❌ spaCy model not found, downloading...")
-            import subprocess
-
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
-            _nlp = spacy.load("en_core_web_sm")
-    return _nlp
+    """Get the singleton spaCy NLP model instance"""
+    return get_nlp_model()
 
 
 def detect_language(text: str) -> str:

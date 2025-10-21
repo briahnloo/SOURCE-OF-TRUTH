@@ -26,6 +26,13 @@ export default function BiasCompass({ sources }: Props) {
     const [showInfo, setShowInfo] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
 
+    const handleToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('BiasCompass toggle clicked, current state:', isExpanded);
+        setIsExpanded(prev => !prev);
+    };
+
     // Deduplicate sources by domain and count articles
     const sourceMap = new Map<string, { source: Source; count: number }>();
 
@@ -86,8 +93,9 @@ export default function BiasCompass({ sources }: Props) {
     return (
         <div className="mt-4">
             <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded-lg border border-gray-200 dark:border-gray-600"
+                onClick={handleToggle}
+                className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded-lg border border-gray-200 dark:border-gray-600 relative z-50 cursor-pointer"
+                type="button"
             >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

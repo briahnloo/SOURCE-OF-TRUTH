@@ -12,15 +12,23 @@ export default function EvidenceDrawer({ sources, scoring }: EvidenceDrawerProps
     const [isOpen, setIsOpen] = useState(true); // Default to open
     const [showAll, setShowAll] = useState(false);
 
+    const handleToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('EvidenceDrawer toggle clicked, current state:', isOpen);
+        setIsOpen(prev => !prev);
+    };
+
     const visibleSources = showAll ? sources : sources.slice(0, 3);
     const hasMore = sources.length > 3;
 
     return (
         <div className="border-t border-gray-200 dark:border-gray-700 mt-4">
             <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+                onClick={handleToggle}
+                className="w-full flex items-center justify-between py-4 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group relative z-50 cursor-pointer"
                 aria-expanded={isOpen}
+                type="button"
             >
                 <span className="flex items-center space-x-2">
                     <span className="text-lg">📰</span>

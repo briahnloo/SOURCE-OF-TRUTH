@@ -93,10 +93,6 @@ body {
         background: linear-gradient(90deg, #f59e0b 0%, #fcd34d 100%);
     }
 
-    .gradient-underreported {
-        background: linear-gradient(90deg, #8b5cf6 0%, #c4b5fd 100%);
-    }
-
     /* Event card enhancements */
     .event-card-natural {
         @apply opacity-75;

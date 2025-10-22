@@ -29,7 +29,6 @@ from app.services.fetch.rss import fetch_rss_articles
 from app.services.fact_check import FactChecker
 from app.services.normalize import normalize_and_store
 from app.services.score import score_recent_events
-from app.services.underreported import detect_underreported
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -523,9 +522,12 @@ def extract_developing_excerpts(db: Session, max_events: int = 10) -> int:
     return processed
 
 
-def add_underreported_excerpts(db: Session, max_events: int = 10) -> int:
+def extract_conflict_excerpts(db: Session, max_events: int = 15) -> int:
     """
-    Add excerpts to underreported events.
+    Extract excerpts for conflict events that don't have them yet.
+    
+    Unlike developing excerpts, this targets ANY event with conflicts
+    regardless of truth score.
     
     Args:
         db: Database session
@@ -534,38 +536,63 @@ def add_underreported_excerpts(db: Session, max_events: int = 10) -> int:
     Returns:
         Number of events processed
     """
-    from app.services.underreported import add_excerpts_to_underreported_event
+    from app.services.coherence import (
+        generate_conflict_explanation,
+        group_by_political_bias,
+        has_political_diversity,
+        identify_narrative_perspectives,
+    )
+    from app.services.embed import generate_embeddings
     
-    underreported = (
+    # Find conflict events without excerpts
+    conflicts = (
         db.query(Event)
-        .filter(Event.underreported == True)
-        .order_by(Event.last_seen.desc())  # Most recent first
-        .limit(max_events)  # Limit to avoid long processing
+        .filter(Event.has_conflict == True)  # Must have conflict flag
+        .filter(Event.conflict_explanation_json != None)  # Has perspectives
+        .order_by(Event.importance_score.desc())  # Highest importance first
+        .limit(max_events)
         .all()
     )
     
     processed = 0
     
-    for event in underreported:
+    for event in conflicts:
         try:
             # Check if already has excerpts
-            if event.conflict_explanation_json:
-                explanation = json.loads(event.conflict_explanation_json)
-                if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
-                    continue
+            explanation = json.loads(event.conflict_explanation_json)
+            if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
+                continue  # Already has excerpts
             
             # Get articles
             articles = db.query(Article).filter(Article.cluster_id == event.id).all()
-            if not articles:
+            if not articles or len(articles) < 2:
                 continue
             
-            # Add excerpts
-            event = add_excerpts_to_underreported_event(event, articles)
+            # Regenerate with excerpt extraction forced
+            texts = [f"{a.title} {a.summary or ''}" for a in articles]
+            embeddings = generate_embeddings(texts)
+            
+            # Group by political bias if diverse
+            if has_political_diversity(articles):
+                perspectives, articles_by_perspective = group_by_political_bias(articles)
+            else:
+                perspectives, articles_by_perspective = identify_narrative_perspectives(articles, embeddings)
+            
+            # Generate with forced excerpt extraction
+            updated_explanation = generate_conflict_explanation(
+                perspectives,
+                articles_by_perspective,
+                force_excerpt_extraction=True
+            )
+            
+            event.conflict_explanation_json = json.dumps(asdict(updated_explanation))
             db.commit()
             processed += 1
             
+            logger.info(f"Extracted excerpts for conflict event {event.id}: {event.summary[:60]}")
+            
         except Exception as e:
-            logger.warning(f"Failed to add excerpts to underreported event {event.id}: {type(e).__name__}: {str(e)}")
+            logger.warning(f"Failed to extract excerpts for conflict event {event.id}: {type(e).__name__}: {str(e)}")
             continue
     
     return processed
@@ -661,7 +688,7 @@ def run_ingestion_pipeline() -> None:
         2. Normalize and store
         3. Cluster articles
         4. Score events
-        5. Detect underreported
+        5. Extract excerpts and re-evaluate conflicts
         6. Fact-check articles
 
     Uses exponential backoff for transient failures and structured logging.
@@ -724,30 +751,23 @@ def run_ingestion_pipeline() -> None:
         step_duration = time.time() - step_start
         log_step_metrics("Score", step_duration, events_scored)
 
-        # Step 5: Detect underreported
+        # Step 5: Extract excerpts for developing events
         step_start = time.time()
-        logger.info("Step 5: Detecting underreported events")
-        underreported_count = detect_underreported(db)
-        step_duration = time.time() - step_start
-        log_step_metrics("Underreported", step_duration, underreported_count)
-
-        # Step 5a: Extract excerpts for developing events
-        step_start = time.time()
-        logger.info("Step 5a: Extracting excerpts for developing events")
+        logger.info("Step 5: Extracting excerpts for developing events")
         developing_excerpts = extract_developing_excerpts(db)
         step_duration = time.time() - step_start
         log_step_metrics("Developing Excerpts", step_duration, developing_excerpts)
 
-        # Step 5b: Add excerpts to underreported events
+        # Step 5b: Extract excerpts for conflict events
         step_start = time.time()
-        logger.info("Step 5b: Adding excerpts to underreported events")
-        underreported_excerpts = add_underreported_excerpts(db)
+        logger.info("Step 5b: Extracting excerpts for conflict events")
+        conflict_excerpts = extract_conflict_excerpts(db)
         step_duration = time.time() - step_start
-        log_step_metrics("Underreported Excerpts", step_duration, underreported_excerpts)
+        log_step_metrics("Conflict Excerpts", step_duration, conflict_excerpts)
 
-        # Step 5c: Re-evaluate recent conflicts
+        # Step 5a: Re-evaluate recent conflicts
         step_start = time.time()
-        logger.info("Step 5c: Re-evaluating conflict status for recent events")
+        logger.info("Step 5a: Re-evaluating conflict status for recent events")
         conflict_changes = reevaluate_event_conflicts(db, hours=48)
         step_duration = time.time() - step_start
         log_step_metrics("Conflict Re-evaluation", step_duration, conflict_changes)
@@ -768,6 +788,7 @@ def run_ingestion_pipeline() -> None:
             f"Pipeline #{pipeline_metrics['total_runs']} completed in {pipeline_duration:.1f}s: "
             f"{len(all_articles)} articles fetched, {stored} stored, "
             f"{events_created} events created, {events_scored} scored, "
+            f"{developing_excerpts} developing excerpts, {conflict_excerpts} conflict excerpts, "
             f"{fact_checked} fact-checked ({flagged} flagged)"
         )
 

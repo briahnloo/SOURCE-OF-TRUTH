@@ -44,8 +44,8 @@ export default function RootLayout({
                                 <nav className="hidden md:flex items-center space-x-1">
                                     <NavLink href="/">Confirmed</NavLink>
                                     <NavLink href="/developing">Developing</NavLink>
-                                    <NavLink href="/underreported">Underreported</NavLink>
                                     <NavLink href="/conflicts">Conflicts</NavLink>
+                                    <NavLink href="/polarizing">Polarizing</NavLink>
                                     <NavLink href="/flagged">Flagged</NavLink>
                                     <NavLink href="/stats">Stats</NavLink>
                                 </nav>

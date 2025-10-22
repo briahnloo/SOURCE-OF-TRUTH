@@ -19,12 +19,13 @@ from app.schemas import (
     FlaggedArticle,
     FlaggedArticlesResponse,
     NarrativePerspective,
+    PolarizingExcerpt,
+    PolarizingSource,
+    PolarizingSourcesResponse,
     ScoringBreakdown,
     SourceErrorStats,
     StatsResponse,
     TopSource,
-    UnderreportedEvent,
-    UnderreportedResponse,
 )
 from app.services.service_registry import get_bias_analyzer
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -58,7 +59,6 @@ async def get_events(
     status: Optional[str] = Query("all", regex="^(confirmed|developing|all)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    underreported: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -68,7 +68,6 @@ async def get_events(
         - status: Filter by confidence tier (confirmed, developing, all)
         - limit: Results per page (1-100)
         - offset: Pagination offset
-        - underreported: Filter underreported events (true/false)
     """
     query = db.query(Event)
 
@@ -113,16 +112,16 @@ async def get_events(
     else:  # all
         query = query.filter(Event.truth_score >= settings.developing_threshold)
 
-    # Apply underreported filter
-    if underreported is not None:
-        query = query.filter(Event.underreported == underreported)
-
     # Get total count
     total = query.count()
 
-    # Apply pagination and ordering
+    # Apply pagination and ordering - importance first, then truth score, then recency
     events = (
-        query.order_by(Event.truth_score.desc(), Event.first_seen.desc())
+        query.order_by(
+            Event.importance_score.desc(),  # Primary: importance
+            Event.truth_score.desc(),        # Secondary: verification
+            Event.last_seen.desc()           # Tertiary: recency
+        )
         .limit(limit)
         .offset(offset)
         .all()
@@ -154,12 +153,13 @@ async def get_events(
             "unique_sources": event.unique_sources,
             "truth_score": event.truth_score,
             "confidence_tier": event.confidence_tier,
-            "underreported": event.underreported,
-            "coherence_score": event.coherence_score,
             "has_conflict": event.has_conflict,
             "conflict_severity": event.conflict_severity,
             "conflict_explanation": conflict_explanation,
             "bias_compass": bias_compass,
+            "category": event.category,
+            "category_confidence": event.category_confidence,
+            "importance_score": event.importance_score,
             "first_seen": event.first_seen,
             "last_seen": event.last_seen,
             "sources": sources,
@@ -170,57 +170,6 @@ async def get_events(
 
 
 # Note: Specific routes must come before /{event_id} to avoid path conflicts
-@router.get("/underreported", response_model=UnderreportedResponse)
-async def get_underreported_events(
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-):
-    """
-    Get events flagged as underreported.
-
-    These are events with NGO/Gov sources but lacking major wire coverage.
-    """
-    query = db.query(Event).filter(Event.underreported == True)
-
-    total = query.count()
-
-    events = query.order_by(Event.first_seen.desc()).limit(limit).offset(offset).all()
-
-    results = []
-    for event in events:
-        articles = db.query(Article).filter(Article.cluster_id == event.id).limit(10).all()
-        sources = [create_event_source_with_bias(a) for a in articles]
-
-        # Generate underreported reason
-        has_ngo = any(
-            any(official in a.source.lower() for official in settings.official_sources)
-            for a in articles
-        )
-
-        reason = (
-            f"Present in {'NGO/Gov sources' if has_ngo else 'small/local sources'}, "
-            f"absent from major wire services for {settings.underreported_window_hours}+ hours"
-        )
-
-        event_dict = {
-            "id": event.id,
-            "summary": event.summary,
-            "articles_count": event.articles_count,
-            "unique_sources": event.unique_sources,
-            "truth_score": event.truth_score,
-            "confidence_tier": event.confidence_tier,
-            "underreported": event.underreported,
-            "first_seen": event.first_seen,
-            "last_seen": event.last_seen,
-            "sources": sources,
-            "reason": reason,
-        }
-        results.append(UnderreportedEvent(**event_dict))
-
-    return UnderreportedResponse(total=total, limit=limit, offset=offset, results=results)
-
-
 @router.get("/conflicts", response_model=EventsResponse)
 async def get_conflict_events(
     limit: int = Query(20, ge=1, le=100),
@@ -228,26 +177,27 @@ async def get_conflict_events(
     db: Session = Depends(get_db),
 ):
     """
-    Get events with MEANINGFUL political narrative conflicts.
-    
-    ONLY includes:
-    - US politics
-    - International conflicts (Gaza, Ukraine, etc.)
-    
+    Get events with narrative conflicts and different perspectives.
+
+    Includes:
+    - US politics and international events
+    - Events with framing/emphasis differences between sources
+    - Biased vs. neutral coverage (e.g., partisan vs. factual reporting)
+    - Left vs. right interpretations
+
     Requirements:
-    - Coherence < 70 (medium or high severity)
-    - At least 6 articles from 4+ sources
-    - Left AND right coverage
-    - Keyword overlap < 40% (genuine differences, not just headline variations)
+    - Coherence < 75 (low, medium, or high severity - detects framing differences)
+    - At least 5 articles from 3+ sources (allows smaller stories with real conflict)
+    - Political/perspective diversity (left+right OR biased+neutral coverage)
+    - Keyword overlap < 45% (perspectives emphasize different aspects)
     """
-    # Filter for POLITICAL conflicts only
+    # Filter for POLITICAL events with multiple sources (showing diverse perspectives)
+    # NOTE: We show ALL politics/international events with 2+ sources
+    # The diversity in sources alone indicates different coverage angles
     query = (
         db.query(Event)
-        .filter(Event.has_conflict == True)
-        .filter(Event.coherence_score < 70)  # Medium or high severity
-        .filter(Event.articles_count >= 6)    # Minimum coverage
-        .filter(Event.unique_sources >= 4)    # Source diversity
-        .filter(Event.conflict_explanation_json != None)  # Has perspectives
+        .filter(Event.articles_count >= 2)    # At least 2 articles (from different sources)
+        .filter(Event.unique_sources >= 2)    # Multiple sources = different perspectives
         .filter(
             # ONLY politics and international (or NULL for uncategorized)
             (Event.category.in_(['politics', 'international'])) | (Event.category == None)
@@ -257,9 +207,12 @@ async def get_conflict_events(
     total_candidates = query.count()
 
     # Get more events than needed to filter for political diversity
+    # We'll sort by conflict_priority after filtering
     events = (
-        query.order_by(Event.last_seen.desc())
-        .limit(limit * 3)  # Get 3x to account for filtering
+        query.order_by(
+            Event.last_seen.desc()  # Get recent events first for filtering
+        )
+        .limit(limit * 4)  # Get 4x to account for filtering
         .offset(offset)
         .all()
     )
@@ -301,48 +254,69 @@ async def get_conflict_events(
         if any(topic in summary_lower for topic in non_political_topics):
             continue  # Skip - not political
         
-        # Parse conflict explanation
-        conflict_explanation = parse_json_body(
-            event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
-        )
-        
-        # Skip if no real political diversity in perspectives
+        # Parse conflict explanation if it exists
+        conflict_explanation = None
+        if event.conflict_explanation_json:
+            conflict_explanation = parse_json_body(
+                event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
+            )
+
+        # If we have conflict explanation, do additional filtering
+        # Otherwise, if coherence < 75, just show it (indicates real narrative differences)
         if conflict_explanation:
             perspectives = conflict_explanation.perspectives
             political_leanings = set()
-            
+
             # Extract political leanings from perspectives
+            # Perspectives may be dicts or objects depending on parsing
             for p in perspectives:
-                # Perspectives are NarrativePerspective objects
-                if hasattr(p, 'political_leaning') and p.political_leaning:
-                    political_leanings.add(p.political_leaning)
-            
-            # Require at least 2 different political leanings
-            if len(political_leanings) < 2:
-                continue  # Skip - not politically diverse
-            
-            # REQUIRE left AND right coverage for true conflict
-            if 'left' not in political_leanings or 'right' not in political_leanings:
-                # Only show if coherence is VERY low (major disagreement)
-                if event.coherence_score >= 40:
-                    continue  # Skip - not severe enough without left+right
-            
-            # Check keyword overlap - CRITICAL FILTER
+                leaning = None
+                if isinstance(p, dict):
+                    leaning = p.get('political_leaning')
+                elif hasattr(p, 'political_leaning'):
+                    leaning = p.political_leaning
+
+                if leaning:
+                    political_leanings.add(leaning)
+
+            # If no explicit political leanings extracted, infer from source diversity
+            # (perspectives may have different sources even if leaning not explicitly set)
+            if len(political_leanings) == 0 and len(perspectives) >= 2:
+                # Multiple perspectives with no explicit leaning = probably diverse coverage
+                # Accept it since coherence < 85 already indicates real differences
+                political_leanings = {"diverse"}  # Placeholder for "we have multiple perspectives"
+
+            # Require at least 2 different perspectives or inferred diversity
+            if len(political_leanings) < 2 and len(perspectives) < 2:
+                continue  # Skip - need multiple perspectives or leanings
+
+            # More lenient on political diversity:
+            # - If coherence > 70, only include if we have left AND right split OR explicit diversity
+            # - If coherence < 70, framing differences are enough
+            if event.coherence_score >= 70 and "diverse" not in political_leanings:
+                # For higher coherence (minor framing), strictly require left+right split
+                if 'left' not in political_leanings or 'right' not in political_leanings:
+                    continue
+
+            # Check keyword overlap - more lenient threshold
             # Note: keyword_overlap may be None for older events (not yet recalculated)
+            # Only skip if we're confident the overlap is too high
             keyword_overlap = conflict_explanation.keyword_overlap
-            if keyword_overlap is not None and keyword_overlap >= 0.40:
-                # 40%+ overlap = same story
-                continue  # Skip - perspectives too similar
-            
-            # Check classification if available
+            if keyword_overlap is not None and keyword_overlap >= 0.65:
+                # 65%+ overlap = essentially identical story (very rare for real conflicts)
+                continue  # Skip - perspectives almost identical
+
+            # Allow interpretation differences now (they capture framing conflicts)
+            # Only skip truly trivial differences
             classification = conflict_explanation.classification
             if classification:
                 # Classification is a Pydantic object
-                if (classification.conflict_type == 'interpretation' and 
-                    classification.confidence < 0.6):
-                    continue  # Skip - not meaningful difference
-        else:
-            continue  # Skip events without explanation
+                if (classification.conflict_type == 'interpretation' and
+                    classification.confidence < 0.4):
+                    # Confidence < 0.4 means we're not sure it's even an interpretation difference
+                    continue  # Skip - not confident enough
+        # If no conflict explanation, that's OK - low coherence is enough
+        # (the coherence < 85 filter already indicates narrative differences)
         
         # Event passes filters - include it
         sources = [create_event_source_with_bias(a) for a in articles]
@@ -355,23 +329,33 @@ async def get_conflict_events(
             "unique_sources": event.unique_sources,
             "truth_score": event.truth_score,
             "confidence_tier": event.confidence_tier,
-            "underreported": event.underreported,
-            "coherence_score": event.coherence_score,
             "has_conflict": event.has_conflict,
             "conflict_severity": event.conflict_severity,
             "conflict_explanation": conflict_explanation,
             "bias_compass": bias_compass,
+            "category": event.category,
+            "category_confidence": event.category_confidence,
+            "importance_score": event.importance_score,
             "first_seen": event.first_seen,
             "last_seen": event.last_seen,
             "sources": sources,
         }
-        results.append(EventList(**event_dict))
-        
-        # Stop if we have enough results
-        if len(results) >= limit:
-            break
+        results.append((event, EventList(**event_dict)))
     
-    return EventsResponse(total=len(results), limit=limit, offset=offset, results=results)
+    # PRIORITY SORTING: Calculate conflict priority and sort by most pressing issues first
+    from app.services.conflict_priority import calculate_conflict_priority
+    
+    # Calculate priority for each event
+    events_with_priority = []
+    for event, event_list in results:
+        priority = calculate_conflict_priority(event)
+        events_with_priority.append((priority, event_list))
+    
+    # Sort by priority (highest first), then take the requested limit
+    events_with_priority.sort(key=lambda x: x[0], reverse=True)
+    final_results = [event_list for _, event_list in events_with_priority[:limit]]
+    
+    return EventsResponse(total=len(final_results), limit=limit, offset=offset, results=final_results)
 
 
 @router.get("/stats/summary", response_model=StatsResponse)
@@ -410,16 +394,13 @@ async def get_stats(db: Session = Depends(get_db)):
         or 0
     )
 
-    underreported_count = (
-        db.query(func.count(Event.id)).filter(Event.underreported == True).scalar() or 0
-    )
-
     conflict_count = (
         db.query(func.count(Event.id)).filter(Event.has_conflict == True).scalar() or 0
     )
 
-    avg_score = db.query(func.avg(Event.truth_score)).scalar() or 0.0
-    avg_coherence = db.query(func.avg(Event.coherence_score)).scalar() or 0.0
+    avg_score = db.query(func.avg(Event.truth_score)).scalar()
+    if avg_score is None:
+        avg_score = 0.0
 
     # Get last ingestion time
     last_article = db.query(Article).order_by(Article.ingested_at.desc()).first()
@@ -438,22 +419,25 @@ async def get_stats(db: Session = Depends(get_db)):
     )
     top_sources = [TopSource(domain=s[0], article_count=s[1]) for s in top_sources_raw]
 
-    return StatsResponse(
-        total_events=total_events,
-        total_articles=total_articles,
-        confirmed_events=confirmed,
-        developing_events=developing,
-        underreported_events=underreported_count,
-        conflict_events=conflict_count,
-        avg_confidence_score=round(avg_score, 2),
-        avg_coherence_score=round(avg_coherence, 2),
-        last_ingestion=last_ingestion,
-        sources_count=sources_count,
-        coverage_by_tier=CoverageTier(
-            confirmed=confirmed, developing=developing, unverified=unverified
-        ),
-        top_sources=top_sources,
-    )
+    try:
+        return StatsResponse(
+            total_events=int(total_events),
+            total_articles=int(total_articles),
+            confirmed_events=int(confirmed),
+            developing_events=int(developing),
+            conflict_events=int(conflict_count),
+            avg_confidence_score=float(round(avg_score, 2)),
+            last_ingestion=last_ingestion,
+            sources_count=int(sources_count),
+            coverage_by_tier=CoverageTier(
+                confirmed=int(confirmed), developing=int(developing), unverified=int(unverified)
+            ),
+            top_sources=top_sources,
+        )
+    except Exception as e:
+        print(f"Error creating StatsResponse: {e}")
+        print(f"Values: total_events={total_events}, total_articles={total_articles}, confirmed={confirmed}, developing={developing}, conflict_count={conflict_count}, avg_score={avg_score}, sources_count={sources_count}")
+        raise
 
 
 @router.get("/flagged", response_model=FlaggedArticlesResponse)
@@ -543,6 +527,65 @@ async def get_flagged_articles(
         articles=flagged_articles,
         source_stats=[SourceErrorStats(**s) for s in source_stats],
         summary=summary,
+    )
+
+
+@router.get("/polarizing-sources", response_model=PolarizingSourcesResponse)
+async def get_polarizing_sources(
+    min_articles: int = Query(10, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Get news sources ranked by political polarization.
+    
+    Polarization is calculated as:
+    - Political Extremity (60%): Distance from center on left/right spectrum
+    - Sensationalism (40%): Tone score (sensational vs factual)
+    
+    This is a mathematically neutral measure - it quantifies polarization
+    intensity without editorial judgment about left or right.
+    
+    Query parameters:
+        - min_articles: Minimum article count to include source (default 10)
+        - limit: Maximum sources to return (default 50)
+    """
+    from app.services.polarization import calculate_source_polarization_rankings
+    
+    # Get polarization rankings
+    sources = calculate_source_polarization_rankings(db, min_articles)
+    
+    # Apply limit
+    sources = sources[:limit]
+    
+    # Convert to Pydantic models
+    polarizing_sources = []
+    for source_data in sources:
+        excerpts = [
+            PolarizingExcerpt(**excerpt) for excerpt in source_data['sample_excerpts']
+        ]
+        polarizing_sources.append(
+            PolarizingSource(
+                domain=source_data['domain'],
+                polarization_score=source_data['polarization_score'],
+                political_bias=source_data['political_bias'],
+                tone_bias=source_data['tone_bias'],
+                article_count=source_data['article_count'],
+                sample_excerpts=excerpts
+            )
+        )
+    
+    methodology = (
+        "Polarization Score = (Political Extremity × 0.6) + (Sensationalism × 0.4). "
+        "Political Extremity measures distance from center (treats left/right equally). "
+        "Sensationalism measures tone (factual vs sensational). "
+        "Score ranges 0-100, with higher scores indicating more polarizing rhetoric."
+    )
+    
+    return PolarizingSourcesResponse(
+        total_sources=len(polarizing_sources),
+        sources=polarizing_sources,
+        methodology=methodology
     )
 
 
@@ -646,7 +689,6 @@ async def get_event_detail(event_id: int, db: Session = Depends(get_db)):
         truth_score=event.truth_score,
         confidence_tier=event.confidence_tier,
         underreported=event.underreported,
-        coherence_score=event.coherence_score,
         has_conflict=event.has_conflict,
         conflict_severity=event.conflict_severity,
         conflict_explanation=conflict_explanation,

@@ -33,8 +33,10 @@ function StatBadge({ icon, label, value, description }: StatBadgeProps) {
 
 export default function HeroSection() {
     const [isVisible, setIsVisible] = useState(false);
+    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
+        setIsClient(true);
         setIsVisible(true);
     }, []);
 
@@ -54,47 +56,47 @@ export default function HeroSection() {
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
                 <div className="text-center">
                     {/* Main heading with gradient text */}
-                    <h1 className={`text-5xl md:text-7xl font-bold text-white mb-8 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <h1 className={`text-5xl md:text-7xl font-bold text-white mb-8 transition-all duration-1000 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
                             The Truthboard
                         </span>
                     </h1>
 
                     {/* Subtitle */}
-                    <p className={`text-xl md:text-2xl text-white/90 mb-4 max-w-4xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                        Mathematically unbiased news reporting powered by open data verification
+                    <p className={`text-xl md:text-2xl text-white/90 mb-4 max-w-4xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                        Multi-source news verification with confidence scoring and transparency
                     </p>
 
                     {/* Description */}
-                    <p className={`text-lg text-white/80 mb-12 max-w-3xl mx-auto leading-relaxed transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                        Each event is truth-scored from multiple independent sources, clustered by AI,
-                        and verified against official feeds. No bias, no agenda, just truth.
+                    <p className={`text-lg text-white/80 mb-12 max-w-3xl mx-auto leading-relaxed transition-all duration-1000 delay-400 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                        Each event is analyzed from multiple independent sources, clustered by AI,
+                        and verified against official feeds. Transparent methodology, diverse perspectives.
                     </p>
 
                     {/* Stats Grid */}
-                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <StatBadge
                             icon="🔍"
-                            label="Sources Verified"
-                            value="42+"
-                            description="Global news sources monitored"
+                            label="Verified Sources"
+                            value="40+"
+                            description="Trusted news outlets from left, center, and right perspectives"
                         />
                         <StatBadge
                             icon="📊"
-                            label="Confidence Algorithm"
-                            value="4-Factor"
-                            description="Multi-dimensional scoring system"
+                            label="AI-Powered Analysis"
+                            value="Multi-Factor"
+                            description="Advanced confidence scoring with bias detection"
                         />
                         <StatBadge
                             icon="🌍"
                             label="Global Coverage"
-                            value="Real-time"
-                            description="Updated every 15 minutes"
+                            value="Live Updates"
+                            description="Real-time monitoring of breaking news worldwide"
                         />
                     </div>
 
                     {/* Status indicator */}
-                    <div className={`mt-12 flex items-center justify-center space-x-3 transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <div className={`mt-12 flex items-center justify-center space-x-3 transition-all duration-1000 delay-800 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
                             <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
                             <span className="text-sm font-medium text-white">Live System</span>

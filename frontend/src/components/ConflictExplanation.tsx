@@ -184,12 +184,21 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
 
             {isMainExpanded && (
                 <div className="mt-2 p-5 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm animate-fade-in">
-                    {/* Key difference summary */}
-                    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border-l-4 border-blue-400">
-                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                            <span className="font-semibold">Key difference: </span>
-                            {explanation.key_difference}
-                        </p>
+                    {/* Key difference summary - Enhanced UI */}
+                    <div className="mb-5 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border-l-4 border-blue-500 dark:border-blue-400 shadow-sm">
+                        <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-0.5">
+                                <span className="text-xl">💡</span>
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-2">
+                                    Why this is flagged as conflicting
+                                </div>
+                                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
+                                    {explanation.key_difference}
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Numerical Discrepancies Section */}

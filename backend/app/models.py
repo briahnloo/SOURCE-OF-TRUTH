@@ -62,6 +62,7 @@ class Event(Base):
     category_confidence = Column(Float, nullable=True)  # 0.0-1.0 confidence in categorization
     conflict_detected_at = Column(DateTime, nullable=True)  # When conflict first emerged
     conflict_history_json = Column(Text, nullable=True)  # Timeline of coherence changes
+    importance_score = Column(Float, nullable=True, index=True, default=0.0)  # Multi-factor importance score (0-100)
     first_seen = Column(DateTime, nullable=False, index=True)
     last_seen = Column(DateTime, nullable=False)
     languages_json = Column(Text)  # JSON string: ["en", "es"]

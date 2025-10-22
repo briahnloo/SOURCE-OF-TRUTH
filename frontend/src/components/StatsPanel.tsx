@@ -36,6 +36,43 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 export default function StatsPanel({ stats }: StatsPanelProps) {
+    const [timeAgo, setTimeAgo] = useState<string>('');
+
+    useEffect(() => {
+        const updateTimeAgo = () => {
+            if (!stats.last_ingestion) {
+                setTimeAgo('N/A');
+                return;
+            }
+
+            const now = new Date();
+            const lastUpdate = new Date(stats.last_ingestion);
+            const diffMs = now.getTime() - lastUpdate.getTime();
+            const diffSeconds = Math.floor(diffMs / 1000);
+            const diffMinutes = Math.floor(diffSeconds / 60);
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffSeconds < 60) {
+                setTimeAgo(`${diffSeconds} second${diffSeconds !== 1 ? 's' : ''} ago`);
+            } else if (diffMinutes < 60) {
+                setTimeAgo(`${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`);
+            } else if (diffHours < 24) {
+                setTimeAgo(`${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`);
+            } else {
+                setTimeAgo(`${diffDays} day${diffDays !== 1 ? 's' : ''} ago`);
+            }
+        };
+
+        // Update immediately
+        updateTimeAgo();
+
+        // Update every second
+        const interval = setInterval(updateTimeAgo, 1000);
+
+        return () => clearInterval(interval);
+    }, [stats.last_ingestion]);
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Events */}
@@ -83,21 +120,6 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                 </div>
             </div>
 
-            {/* Underreported */}
-            <div className="card bg-gradient-to-br from-underreported-50 to-white dark:from-underreported-900/20 dark:to-gray-900 border-l-4 border-underreported hover:scale-105 transition-transform duration-200">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-xs font-semibold text-underreported-dark dark:text-underreported-light uppercase tracking-wide">
-                            Underreported
-                        </div>
-                        <div className="mt-2 text-4xl font-bold text-underreported-dark dark:text-underreported-light">
-                            <span className="tabular-nums">{stats.underreported_events.toLocaleString()}</span>
-                        </div>
-                    </div>
-                    <div className="text-4xl">📢</div>
-                </div>
-            </div>
-
             {/* Conflicts */}
             <div className="card bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/20 dark:to-gray-900 border-l-4 border-yellow-500 hover:scale-105 transition-transform duration-200">
                 <div className="flex items-center justify-between">
@@ -125,21 +147,6 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">⭐</div>
-                </div>
-            </div>
-
-            {/* Avg Coherence */}
-            <div className="card bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 hover:scale-105 transition-transform duration-200">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                            Avg Source Agreement
-                        </div>
-                        <div className="mt-2 text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                            {stats.avg_coherence_score.toFixed(1)}
-                        </div>
-                    </div>
-                    <div className="text-4xl opacity-20">🤝</div>
                 </div>
             </div>
 
@@ -176,17 +183,32 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
             {/* Last Ingestion */}
             <div className="card bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 hover:scale-105 transition-transform duration-200">
                 <div className="flex items-center justify-between">
-                    <div>
+                    <div className="w-full">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                             Last Update
                         </div>
                         <div className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
                             {stats.last_ingestion
-                                ? new Date(stats.last_ingestion).toLocaleTimeString()
+                                ? (() => {
+                                    const date = new Date(stats.last_ingestion);
+                                    const timeString = date.toLocaleTimeString('en-US', {
+                                        timeZone: 'America/Los_Angeles',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: true
+                                    });
+                                    return `${timeString} PST`;
+                                })()
                                 : 'N/A'}
                         </div>
-                        <div className="mt-1 flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <div className="mt-2 flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs font-medium text-primary-600 dark:text-primary-400">
+                                    {timeAgo}
+                                </span>
+                            </div>
                             <span className="text-xs text-gray-500">Live</span>
                         </div>
                     </div>

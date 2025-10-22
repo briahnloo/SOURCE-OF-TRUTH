@@ -43,10 +43,6 @@ class Settings(BaseSettings):
     dbscan_min_samples: int = 3
     clustering_window_hours: int = 24
 
-    # Underreported detection
-    underreported_window_hours: int = 48
-    underreported_min_sources: int = 2
-
     # Data retention
     article_retention_days: int = 30
 
@@ -71,13 +67,6 @@ class Settings(BaseSettings):
         "nasa.gov",
         "unocha.org",
         "reliefweb.int",
-    ]
-
-    # Major wire services (for underreported detection)
-    major_wires: List[str] = [
-        "ap.org",
-        "reuters.com",
-        "afp.com",
     ]
 
 

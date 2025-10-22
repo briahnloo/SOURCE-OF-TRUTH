@@ -17,6 +17,7 @@ services:
       - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
       - GOOGLE_FACTCHECK_API_KEY=${GOOGLE_FACTCHECK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
@@ -38,6 +39,7 @@ services:
       - MEDIASTACK_KEY=${MEDIASTACK_KEY:-}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
       - GOOGLE_FACTCHECK_API_KEY=${GOOGLE_FACTCHECK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     command: python -m app.workers.scheduler
     networks:
       - truth-layer-network

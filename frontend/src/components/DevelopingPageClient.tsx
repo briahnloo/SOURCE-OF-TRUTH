@@ -29,7 +29,7 @@ export default function DevelopingPageClient({ events, error }: Props) {
         e.sources?.some(s => s.political_bias && s.political_bias.right > s.political_bias.center && s.political_bias.right > s.political_bias.left)
     ).length;
 
-    const conflictCount = events.filter(e => e.has_conflict && (e.coherence_score ?? 100) < 60).length;
+    const conflictCount = events.filter(e => e.has_conflict).length;
 
     return (
         <div className="min-h-screen">

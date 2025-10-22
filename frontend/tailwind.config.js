@@ -36,14 +36,6 @@ module.exports = {
                     dark: '#d97706',
                     900: '#78350f',
                 },
-                underreported: {
-                    50: '#faf5ff',
-                    100: '#f3e8ff',
-                    light: '#c4b5fd',
-                    DEFAULT: '#8b5cf6',
-                    dark: '#7c3aed',
-                    900: '#4c1d95',
-                },
                 accent: {
                     DEFAULT: '#14b8a6',
                     dark: '#0d9488',

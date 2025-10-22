@@ -353,9 +353,11 @@ def has_political_diversity(articles: List[Article]) -> bool:
             
             if bias:
                 political = bias.political
-                if political.get('left', 0) > 0.5:
+                # Lowered threshold to 0.45 to catch moderate leanings
+                # (e.g., independent.co.uk with left=0.5 now counts as left-leaning)
+                if political.get('left', 0) >= 0.45:
                     has_left = True
-                if political.get('right', 0) > 0.5:
+                if political.get('right', 0) >= 0.45:
                     has_right = True
         
         return has_left and has_right
@@ -365,7 +367,7 @@ def has_political_diversity(articles: List[Article]) -> bool:
 
 
 def group_by_political_bias(articles: List[Article]) -> Tuple[List[NarrativePerspective], List[List[Article]]]:
-    """
+    """. fu
     Group articles by the political leaning of their source.
 
     Creates three groups: Left, Center, Right based on source bias classifications.
@@ -992,7 +994,27 @@ def generate_conflict_explanation(
         ConflictExplanation object
     """
     # Identify what differs
-    difference_type, key_diff = identify_key_difference(perspectives)
+    difference_type, generic_key_diff = identify_key_difference(perspectives)
+    
+    # Try to generate detailed explanation with LLM
+    detailed_explanation = None
+    if has_perspective_diversity(perspectives):
+        # Flatten all articles from perspectives for context
+        all_articles = []
+        if articles_by_perspective:
+            for article_list in articles_by_perspective:
+                all_articles.extend(article_list)
+        
+        # Extract event summary from articles
+        event_summary = all_articles[0].title if all_articles else ""
+        detailed_explanation = generate_detailed_conflict_explanation(
+            perspectives, 
+            event_summary, 
+            all_articles
+        )
+    
+    # Use detailed explanation if available, fallback to generic
+    key_diff = detailed_explanation if detailed_explanation else generic_key_diff
     
     # Detect numerical discrepancies
     numeric_discrepancies = []
@@ -1346,5 +1368,113 @@ def identify_key_difference(
             )
 
     return "interpretation", "Sources provide different interpretations of the same facts"
+
+
+def has_perspective_diversity(perspectives: List[NarrativePerspective]) -> bool:
+    """
+    Check if perspectives span different political leanings.
+    
+    Args:
+        perspectives: List of narrative perspectives
+        
+    Returns:
+        True if at least 2 perspectives with different political leanings exist
+    """
+    if len(perspectives) < 2:
+        return False
+    
+    leanings = set()
+    for p in perspectives:
+        if p.political_leaning:
+            leanings.add(p.political_leaning)
+    
+    # Need at least 2 different leanings
+    return len(leanings) >= 2
+
+
+def generate_detailed_conflict_explanation(
+    perspectives: List[NarrativePerspective],
+    event_summary: str,
+    articles: List[Article]
+) -> Optional[str]:
+    """
+    Use LLM to generate specific explanation of narrative differences.
+    
+    Cost estimate: ~$0.0003 per event with gpt-4o-mini
+    (~150 input tokens + ~50 output tokens = ~$0.0003 per call)
+    
+    Args:
+        perspectives: List of narrative perspectives with political leanings
+        event_summary: Brief summary of the event
+        articles: Original articles for context
+    
+    Returns:
+        1-2 sentence explanation of how sources differ, or None if generation fails
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Check if LLM explanations are disabled
+    if os.getenv("DISABLE_LLM_EXPLANATIONS", "").lower() == "true":
+        logger.info("LLM explanations disabled via environment variable")
+        return None
+    
+    try:
+        logger.info(f"Generating LLM explanation for event: {event_summary[:100]}")
+        
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Build perspective summary for LLM
+        perspective_descriptions = []
+        for p in perspectives:
+            leaning_label = {
+                'left': 'Liberal/left-leaning',
+                'right': 'Conservative/right-leaning',
+                'center': 'Center/neutral'
+            }.get(p.political_leaning, 'Unknown')
+            
+            perspective_descriptions.append(
+                f"{leaning_label} sources ({', '.join(p.sources[:3])}): "
+                f"Title: '{p.representative_title}', "
+                f"Sentiment: {p.sentiment}, "
+                f"Key focus: {', '.join(p.focus_keywords[:5])}"
+            )
+        
+        prompt = f"""Analyze how different political perspectives cover this news event differently.
+
+Event: {event_summary}
+
+Perspectives:
+{chr(10).join(perspective_descriptions)}
+
+Write a 1-2 sentence explanation of the KEY DIFFERENCE in how these perspectives frame or cover this event. Be specific about what each political perspective emphasizes, downplays, or frames differently. Focus on concrete differences in emphasis, framing, facts mentioned, or tone.
+
+Format: "Left-leaning sources [specific framing], while right-leaning sources [specific framing]." or similar.
+
+Keep it factual, neutral, and specific. Avoid generic statements."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Cheaper and faster
+            messages=[
+                {"role": "system", "content": "You are an expert media analyst identifying narrative differences across political perspectives."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=150
+        )
+        
+        explanation = response.choices[0].message.content.strip()
+        
+        # Validate response quality
+        if len(explanation) < 30 or "I cannot" in explanation:
+            logger.warning(f"LLM explanation too short or refused: {explanation}")
+            return None
+        
+        logger.info(f"LLM explanation generated successfully: {explanation[:100]}...")
+        return explanation
+        
+    except Exception as e:
+        logger.warning(f"LLM explanation generation failed: {e}. Using generic fallback.")
+        return None
 
 

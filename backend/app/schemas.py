@@ -151,14 +151,13 @@ class EventBase(BaseModel):
     unique_sources: int
     truth_score: float
     confidence_tier: str
-    underreported: bool
-    coherence_score: Optional[float] = None
     has_conflict: bool = False
     conflict_severity: Optional[str] = None
     conflict_explanation: Optional[ConflictExplanation] = None
     bias_compass: Optional[BiasCompass] = None
     category: Optional[str] = None
     category_confidence: Optional[float] = None
+    importance_score: Optional[float] = None  # Multi-factor importance score (0-100)
     first_seen: datetime
     last_seen: datetime
 
@@ -194,17 +193,6 @@ class EventsResponse(BaseModel):
     results: List[EventList]
 
 
-class UnderreportedEvent(EventList):
-    reason: str
-
-
-class UnderreportedResponse(BaseModel):
-    total: int
-    limit: int
-    offset: int
-    results: List[UnderreportedEvent]
-
-
 # Statistics schemas
 class CoverageTier(BaseModel):
     confirmed: int
@@ -222,10 +210,8 @@ class StatsResponse(BaseModel):
     total_articles: int
     confirmed_events: int
     developing_events: int
-    underreported_events: int
     conflict_events: int
     avg_confidence_score: float
-    avg_coherence_score: float
     last_ingestion: Optional[datetime]
     sources_count: int
     coverage_by_tier: CoverageTier
@@ -239,6 +225,35 @@ class HealthResponse(BaseModel):
     worker_last_run: Optional[datetime]
     total_events: int
     total_articles: int
+
+
+# Polarizing sources schemas
+class PolarizingExcerpt(BaseModel):
+    """Excerpt from a polarizing news source"""
+    title: str
+    url: str
+    summary: str
+    timestamp: datetime
+    polarization_score: float  # 0-100 score for this specific excerpt
+    highlighted_keywords: List[str]  # Polarizing words found
+    topic_tags: List[str]  # "Trump", "Congress", etc.
+
+
+class PolarizingSource(BaseModel):
+    """News source with polarization metrics"""
+    domain: str
+    polarization_score: float
+    political_bias: Dict[str, float]
+    tone_bias: Dict[str, float]
+    article_count: int
+    sample_excerpts: List[PolarizingExcerpt]
+
+
+class PolarizingSourcesResponse(BaseModel):
+    """Response for polarizing sources endpoint"""
+    total_sources: int
+    sources: List[PolarizingSource]
+    methodology: str
 
 
 # Error schema

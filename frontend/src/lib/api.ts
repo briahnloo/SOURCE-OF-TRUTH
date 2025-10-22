@@ -60,8 +60,6 @@ export interface Event {
     unique_sources: number;
     truth_score: number;
     confidence_tier: string;
-    underreported: boolean;
-    coherence_score?: number;
     has_conflict?: boolean;
     conflict_severity?: string;
     conflict_explanation?: ConflictExplanation;
@@ -159,10 +157,8 @@ export interface StatsResponse {
     total_articles: number;
     confirmed_events: number;
     developing_events: number;
-    underreported_events: number;
     conflict_events: number;
     avg_confidence_score: number;
-    avg_coherence_score: number;
     last_ingestion?: string;
     sources_count: number;
     coverage_by_tier: {
@@ -179,6 +175,31 @@ export interface HealthResponse {
     worker_last_run?: string;
     total_events: number;
     total_articles: number;
+}
+
+export interface PolarizingExcerpt {
+    title: string;
+    url: string;
+    summary: string;
+    timestamp: string;
+    polarization_score: number;
+    highlighted_keywords: string[];
+    topic_tags: string[];
+}
+
+export interface PolarizingSource {
+    domain: string;
+    polarization_score: number;
+    political_bias: { left: number; center: number; right: number };
+    tone_bias: { sensational: number; factual: number };
+    article_count: number;
+    sample_excerpts: PolarizingExcerpt[];
+}
+
+export interface PolarizingSourcesResponse {
+    total_sources: number;
+    sources: PolarizingSource[];
+    methodology: string;
 }
 
 class APIError extends Error {
@@ -224,14 +245,11 @@ export const api = {
         status?: 'confirmed' | 'developing' | 'all';
         limit?: number;
         offset?: number;
-        underreported?: boolean;
     }): Promise<EventsResponse> {
         const queryParams = new URLSearchParams();
         if (params?.status) queryParams.set('status', params.status);
         if (params?.limit) queryParams.set('limit', params.limit.toString());
         if (params?.offset) queryParams.set('offset', params.offset.toString());
-        if (params?.underreported !== undefined)
-            queryParams.set('underreported', params.underreported.toString());
 
         const query = queryParams.toString();
         return fetchAPI<EventsResponse>(`/events${query ? `?${query}` : ''}`);
@@ -242,21 +260,6 @@ export const api = {
      */
     async getEventDetail(id: number): Promise<EventDetail> {
         return fetchAPI<EventDetail>(`/events/${id}`);
-    },
-
-    /**
-     * Get underreported events
-     */
-    async getUnderreported(params?: {
-        limit?: number;
-        offset?: number;
-    }): Promise<EventsResponse> {
-        const queryParams = new URLSearchParams();
-        if (params?.limit) queryParams.set('limit', params.limit.toString());
-        if (params?.offset) queryParams.set('offset', params.offset.toString());
-
-        const query = queryParams.toString();
-        return fetchAPI<EventsResponse>(`/events/underreported${query ? `?${query}` : ''}`);
     },
 
     /**
@@ -304,5 +307,20 @@ export const api = {
      */
     async getHealth(): Promise<HealthResponse> {
         return fetchAPI<HealthResponse>('/health');
+    },
+
+    /**
+     * Get polarizing sources ranked by political rhetoric
+     */
+    async getPolarizingSources(params?: {
+        min_articles?: number;
+        limit?: number;
+    }): Promise<PolarizingSourcesResponse> {
+        const queryParams = new URLSearchParams();
+        if (params?.min_articles) queryParams.set('min_articles', params.min_articles.toString());
+        if (params?.limit) queryParams.set('limit', params.limit.toString());
+
+        const query = queryParams.toString();
+        return fetchAPI<PolarizingSourcesResponse>(`/events/polarizing-sources${query ? `?${query}` : ''}`);
     },
 };

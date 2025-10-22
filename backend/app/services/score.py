@@ -5,6 +5,7 @@ from typing import List
 
 from app.config import settings
 from app.models import Article, Event
+from app.services.importance import calculate_importance_score
 from sqlalchemy.orm import Session
 
 # Trusted news sources for political event verification
@@ -168,6 +169,9 @@ def score_event(event: Event, db: Session) -> float:
 
     # Calculate total
     truth_score = source_score + geo_score + evidence_score + official_score
+    
+    # Calculate importance score
+    event.importance_score = calculate_importance_score(event)
 
     return round(truth_score, 2)
 

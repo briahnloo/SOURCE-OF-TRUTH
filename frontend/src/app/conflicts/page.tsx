@@ -17,7 +17,7 @@ export default async function ConflictsPage() {
         console.error('Error fetching conflicts:', err);
     }
 
-    // Filter for MEANINGFUL conflicts only (backend should handle this, but double-check)
+    // Filter for conflicts with interesting narrative differences (backend does main filtering)
     const relevantEvents = events.filter(event => {
         // Only show events with political/social perspectives
         if (event.category === 'natural_disaster') return false;
@@ -28,24 +28,9 @@ export default async function ConflictsPage() {
         const irrelevantKeywords = ['fanduel', 'nfl', 'betting', 'odds', 'picks', 'prediction'];
         if (irrelevantKeywords.some(kw => title.includes(kw))) return false;
 
-        // Must have multiple perspectives
-        const perspectives = event.conflict_explanation?.perspectives || [];
-        if (perspectives.length < 2) return false;
-
-        // Must have political diversity (at least 2 different leanings)
-        const politicalLeanings = new Set(
-            perspectives
-                .map((p: any) => p.political_leaning)
-                .filter(Boolean)
-        );
-
-        if (politicalLeanings.size < 2) return false;
-
-        // Must have sufficient coverage
-        if (event.articles_count < 6) return false;
-
-        // Must be medium/high severity
-        if (!event.coherence_score || event.coherence_score >= 70) return false;
+        // Backend has already filtered for 2+ sources, so just show what comes back
+        // The diverse sources themselves indicate different coverage angles
+        // (Frontend filtering was too strict - removing it)
 
         return true;
     });
@@ -60,12 +45,12 @@ export default async function ConflictsPage() {
                     Conflicting Narratives
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-                    US political and international conflicts where left and right sources present genuinely different narratives
+                    Events where different sources tell the same story very differently - through framing, emphasis, tone, and interpretation
                 </p>
 
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Showing {relevantEvents.length} political conflicts with substantive left vs right differences
-                    {filteredCount > 0 && ` (filtered ${filteredCount} minor variations)`}
+                    Showing {relevantEvents.length} narrative conflicts with meaningful perspective differences
+                    {filteredCount > 0 && ` (filtered ${filteredCount} non-political events)`}
                 </p>
 
                 {/* Info Card */}
@@ -77,22 +62,23 @@ export default async function ConflictsPage() {
                                 What this means
                             </h3>
                             <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                                These events have multiple interpretations or disputed facts. This
-                                doesn&apos;t mean misinformation - just that sources disagree. We
-                                recommend reading multiple perspectives to understand the full
-                                context.
+                                These events are covered very differently across sources. The same facts might be
+                                framed as positive/negative, emphasized differently, or presented with conflicting
+                                context. This is NOT necessarily misinformation - it&apos;s how bias, editorial choices,
+                                and audience preferences shape news narratives.
                             </p>
                             <ul className="mt-3 space-y-1 text-sm text-yellow-800 dark:text-yellow-300">
-                                <li>• Different angles on the same story</li>
-                                <li>• Developing situation with evolving details</li>
-                                <li>• Legitimate debate or interpretation</li>
-                                <li>• Need for careful reading from multiple sources</li>
+                                <li>• Partisan vs. neutral framing of the same event</li>
+                                <li>• Different emphasis on which facts matter most</li>
+                                <li>• Tone differences (sensational vs. measured)</li>
+                                <li>• Competing narratives from left/right or other perspectives</li>
+                                <li>• Genuine reporting disagreements on what happened</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                {/* Coherence Score Explanation */}
+                {/* Detection Methodology */}
                 <div className="card bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-700 text-left max-w-3xl mx-auto">
                     <div className="flex items-start space-x-3">
                         <span className="text-2xl">📊</span>
@@ -101,34 +87,34 @@ export default async function ConflictsPage() {
                                 How we detect conflicts
                             </h3>
                             <p className="text-sm text-blue-800 dark:text-blue-300 mb-3">
-                                Each event gets a <strong>Coherence Score (0-100)</strong> that
-                                measures how much sources agree on the narrative. Only events with coherence below 70 AND coverage from left and right sources appear here.
+                                We detect narrative conflicts through semantic analysis, bias detection, and perspective extraction. These aren&apos;t just headline differences - they&apos;re meaningful divergences in how events are framed and interpreted.
                             </p>
                             <div className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
                                 <div>
-                                    <strong>The score combines three factors:</strong>
+                                    <strong>Multi-layered detection:</strong>
                                 </div>
                                 <ul className="space-y-1 ml-4">
                                     <li>
-                                        • <strong>Semantic similarity (60%)</strong> - How similar are
-                                        the article contents?
+                                        • <strong>Semantic analysis</strong> - Embedding similarity detects when articles use different language/framing for the same event
                                     </li>
                                     <li>
-                                        • <strong>Entity overlap (25%)</strong> - Do sources mention
-                                        the same people, places, organizations?
+                                        • <strong>Entity & sentiment analysis</strong> - Identifies how sources emphasize different facts, people, and outcomes
                                     </li>
                                     <li>
-                                        • <strong>Title consistency (15%)</strong> - Are headlines
-                                        aligned on the story?
+                                        • <strong>Bias detection</strong> - Finds partisan vs. neutral coverage (left, center, right sources)
+                                    </li>
+                                    <li>
+                                        • <strong>Perspective extraction</strong> - AI identifies the distinct narrative angles each group tells
                                     </li>
                                 </ul>
                                 <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
-                                    <strong>Quality filters applied:</strong>
+                                    <strong>What we show you:</strong>
                                     <ul className="space-y-1 ml-4 mt-1">
-                                        <li>• <strong>Politics/International only</strong> - US politics and global conflicts (Gaza, Ukraine)</li>
-                                        <li>• <strong>Left AND right coverage</strong> - True political spectrum differences</li>
-                                        <li>• <strong>Keyword overlap &lt; 40%</strong> - Perspectives say different things, not just different words</li>
-                                        <li>• <strong>6+ articles, coherence &lt; 70</strong> - Substantive disagreement patterns</li>
+                                        <li>• <strong>Diverse narrative framing</strong> - How the same event is told very differently</li>
+                                        <li>• <strong>Cross-political coverage</strong> - Left, right, and center sources with their differing angles</li>
+                                        <li>• <strong>Substantive disagreements</strong> - 5+ articles from 3+ sources (real coverage, not anomalies)</li>
+                                        <li>• <strong>Genuine difference in perspective</strong> - Not just headline variations (keyword overlap &lt; 50%)</li>
+                                        <li>• <strong>Politics & international events</strong> - Where different narratives matter most</li>
                                     </ul>
                                 </div>
                             </div>

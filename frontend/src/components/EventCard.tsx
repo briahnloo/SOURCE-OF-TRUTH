@@ -2,14 +2,12 @@
 
 import { Event } from '@/lib/api';
 import BiasCompass from './BiasCompass';
-import CoherenceMeter from './CoherenceMeter';
 import ConfidenceMeter from './ConfidenceMeter';
 import ConflictExplanation from './ConflictExplanation';
 import EvidenceDrawer from './EvidenceDrawer';
 import FactCheckWarnings from './FactCheckWarnings';
 import PerspectiveBadge from './PerspectiveBadge';
 import UnbiasedSummary from './UnbiasedSummary';
-import UnderreportedExcerpt from './UnderreportedExcerpt';
 
 interface EventCardProps {
     event: Event;
@@ -48,8 +46,8 @@ export default function EventCard({ event }: EventCardProps) {
 
     // Determine visual treatment based on category and scores
     const isNaturalEvent = event.category === 'natural_disaster' || event.category === 'health';
-    const hasHighConflict = event.has_conflict && (event.coherence_score ?? 100) < 40;
-    const isHighTrust = event.truth_score >= 75 && (event.coherence_score ?? 100) >= 70;
+    const hasHighConflict = event.has_conflict;
+    const isHighTrust = event.truth_score >= 75;
 
     const cardClasses = [
         'group relative overflow-hidden',
@@ -133,29 +131,18 @@ export default function EventCard({ event }: EventCardProps) {
                                 🏛️ Official Source
                             </span>
                         )}
-                        {event.underreported && (
-                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-sm">
-                                📢 Underreported
-                            </span>
-                        )}
                     </div>
                 </div>
 
                 {/* Metrics Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="mb-6">
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
                         <ConfidenceMeter score={event.truth_score} tier={event.confidence_tier} />
                     </div>
-
-                    {event.coherence_score !== undefined && event.coherence_score !== null && (
-                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
-                            <CoherenceMeter score={event.coherence_score} />
-                        </div>
-                    )}
                 </div>
 
                 {/* Conflict Warning */}
-                {event.has_conflict && event.conflict_severity && (event.coherence_score ?? 100) < 40 && (
+                {event.has_conflict && event.conflict_severity && (
                     <div className="mb-6">
                         <div
                             className={`p-4 rounded-xl border-l-4 ${event.conflict_severity === 'high'
@@ -194,7 +181,7 @@ export default function EventCard({ event }: EventCardProps) {
                 )}
 
                 {/* Unbiased Summary */}
-                {event.conflict_explanation && (event.coherence_score ?? 100) >= 40 && event.sources && (
+                {event.conflict_explanation && !event.has_conflict && event.sources && (
                     <div className="mb-6">
                         <UnbiasedSummary
                             conflictExplanation={event.conflict_explanation}
@@ -206,15 +193,6 @@ export default function EventCard({ event }: EventCardProps) {
                                 severity={event.conflict_severity || 'low'}
                             />
                         </div>
-                    </div>
-                )}
-
-                {/* Underreported Excerpt - Show relevant excerpt from coverage */}
-                {event.underreported && event.conflict_explanation && (
-                    <div className="mb-6">
-                        <UnderreportedExcerpt
-                            conflictExplanation={event.conflict_explanation}
-                        />
                     </div>
                 )}
 

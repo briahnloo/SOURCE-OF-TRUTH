@@ -418,8 +418,8 @@ class FactChecker:
             scores['semantic_similarity'] * 0.5
         )
         
-        # Require 60% composite relevance
-        is_relevant = composite >= 0.6
+        # Require 54.5% composite relevance
+        is_relevant = composite >= 0.545
         
         logger.debug(
             f"Relevance: {composite:.1%} "

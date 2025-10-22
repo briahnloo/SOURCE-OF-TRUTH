@@ -41,33 +41,56 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
     useEffect(() => {
         const updateTimeAgo = () => {
             if (!stats.last_ingestion) {
-                setTimeAgo('N/A');
+                setTimeAgo('No data');
                 return;
             }
 
-            const now = new Date();
-            const lastUpdate = new Date(stats.last_ingestion);
-            const diffMs = now.getTime() - lastUpdate.getTime();
-            const diffSeconds = Math.floor(diffMs / 1000);
-            const diffMinutes = Math.floor(diffSeconds / 60);
-            const diffHours = Math.floor(diffMinutes / 60);
-            const diffDays = Math.floor(diffHours / 24);
+            try {
+                const now = new Date();
+                const lastUpdate = new Date(stats.last_ingestion);
 
-            if (diffSeconds < 60) {
-                setTimeAgo(`${diffSeconds} second${diffSeconds !== 1 ? 's' : ''} ago`);
-            } else if (diffMinutes < 60) {
-                setTimeAgo(`${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`);
-            } else if (diffHours < 24) {
-                setTimeAgo(`${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`);
-            } else {
-                setTimeAgo(`${diffDays} day${diffDays !== 1 ? 's' : ''} ago`);
+                // Handle invalid dates
+                if (isNaN(lastUpdate.getTime())) {
+                    setTimeAgo('Invalid timestamp');
+                    return;
+                }
+
+                // Calculate time difference in milliseconds
+                const diffMs = now.getTime() - lastUpdate.getTime();
+
+                // Handle negative time (future timestamp - shouldn't happen but catch it)
+                if (diffMs < 0) {
+                    setTimeAgo('Just now');
+                    return;
+                }
+
+                const diffSeconds = Math.floor(diffMs / 1000);
+                const diffMinutes = Math.floor(diffSeconds / 60);
+                const diffHours = Math.floor(diffMinutes / 60);
+                const diffDays = Math.floor(diffHours / 24);
+
+                // Display with appropriate granularity
+                if (diffSeconds < 10) {
+                    setTimeAgo('Just now');
+                } else if (diffSeconds < 60) {
+                    setTimeAgo(`${diffSeconds} second${diffSeconds !== 1 ? 's' : ''} ago`);
+                } else if (diffMinutes < 60) {
+                    setTimeAgo(`${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`);
+                } else if (diffHours < 24) {
+                    setTimeAgo(`${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`);
+                } else {
+                    setTimeAgo(`${diffDays} day${diffDays !== 1 ? 's' : ''} ago`);
+                }
+            } catch (error) {
+                console.error('Error calculating time ago:', error);
+                setTimeAgo('Error');
             }
         };
 
         // Update immediately
         updateTimeAgo();
 
-        // Update every second
+        // Update every second for real-time feel
         const interval = setInterval(updateTimeAgo, 1000);
 
         return () => clearInterval(interval);
@@ -180,14 +203,21 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                 </div>
             </div>
 
-            {/* Last Ingestion */}
+            {/* Last Update - Shows when data was last refreshed */}
             <div className="card bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 hover:scale-105 transition-transform duration-200">
                 <div className="flex items-center justify-between">
                     <div className="w-full">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                             Last Update
                         </div>
+
+                        {/* Main Display: Time Ago (e.g., "2 minutes ago") */}
                         <div className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
+                            {timeAgo || 'N/A'}
+                        </div>
+
+                        {/* Secondary Display: Actual time in PST (e.g., "2:30 PM PST") */}
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-500">
                             {stats.last_ingestion
                                 ? (() => {
                                     const date = new Date(stats.last_ingestion);
@@ -200,16 +230,13 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                                     });
                                     return `${timeString} PST`;
                                 })()
-                                : 'N/A'}
+                                : 'No data'}
                         </div>
-                        <div className="mt-2 flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs font-medium text-primary-600 dark:text-primary-400">
-                                    {timeAgo}
-                                </span>
-                            </div>
-                            <span className="text-xs text-gray-500">Live</span>
+
+                        {/* Status Indicator */}
+                        <div className="mt-2 flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Live</span>
                         </div>
                     </div>
                     <div className="text-4xl opacity-20">⏱️</div>

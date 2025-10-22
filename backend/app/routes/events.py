@@ -402,8 +402,14 @@ async def get_stats(db: Session = Depends(get_db)):
     if avg_score is None:
         avg_score = 0.0
 
-    # Get last ingestion time
-    last_article = db.query(Article).order_by(Article.ingested_at.desc()).first()
+    # Get last ingestion time (most recent article ingestion, guaranteed recent)
+    # This represents when the last article was processed by the pipeline
+    last_article = (
+        db.query(Article)
+        .filter(Article.ingested_at != None)  # Ensure timestamp exists
+        .order_by(Article.ingested_at.desc())
+        .first()
+    )
     last_ingestion = last_article.ingested_at if last_article else None
 
     # Get unique sources count

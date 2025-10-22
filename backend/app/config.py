@@ -46,16 +46,39 @@ class Settings(BaseSettings):
     # Data retention
     article_retention_days: int = 30
 
-    # Ingestion scheduling
+    # Ingestion scheduling - LEGACY (for backward compatibility with old scheduler)
+    # TODO: Switch to tiered_scheduler.py once deployed
     ingestion_interval_peak: int = 15  # minutes during peak hours
     ingestion_interval_offpeak: int = 30  # minutes during off-peak hours
-    peak_hours_start: int = 6  # 6 AM (24-hour format)
-    peak_hours_end: int = 23  # 11 PM (24-hour format)
+
+    # Ingestion scheduling - Tiered Pipeline (for new system)
+    # TIER 1: Fast ingestion (critical sources only)
+    tier1_interval_peak: int = 10  # minutes, GDELT only
+    tier1_interval_offpeak: int = 20  # minutes off-peak
+
+    # TIER 2: Standard ingestion (main sources)
+    tier2_interval_peak: int = 15  # minutes
+    tier2_interval_offpeak: int = 30  # minutes
+
+    # TIER 3: Analysis pipeline (embeddings, coherence)
+    tier3_interval: int = 60  # once per hour (all hours)
+
+    # TIER 4: Deep analysis (fact-checking, importance)
+    tier4_interval: int = 240  # every 4 hours
+
+    # Peak hour definition
+    peak_hours_start: int = 6  # 6 AM
+    peak_hours_end: int = 23  # 11 PM
 
     # Performance optimization
-    enable_parallel_fetching: bool = True  # fetch sources in parallel
-    max_fact_check_workers: int = 3  # concurrent fact-check workers
-    fact_check_batch_size: int = 50  # articles per run
+    enable_parallel_fetching: bool = True
+    max_fact_check_workers: int = 2  # reduced from 3
+    fact_check_batch_size: int = 30  # reduced from 50, fact-check every 4h so lower per-run
+
+    # Intelligent batching
+    max_excerpts_per_run: int = 8  # down from 10/15
+    max_articles_for_analysis: int = 100  # cap memory usage
+    conflict_reevaluation_hours: int = 6  # down from 48 (most resolved by then)
 
     # Embedding model
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

@@ -29,7 +29,7 @@ export default async function PolarizingPage() {
                     </h1>
                     <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
                         News sources ranked by political rhetoric polarization, showing their most inflammatory headlines.
-                        Each excerpt is scored by keyword analysis - identifying words like "illegal", "radical", "slams", and "crisis".
+                        Each excerpt is scored by keyword analysis - identifying words like &quot;illegal&quot;, &quot;radical&quot;, &quot;slams&quot;, and &quot;crisis&quot;.
                     </p>
 
                     {/* Methodology Card */}
@@ -47,9 +47,9 @@ export default async function PolarizingPage() {
                                     <p><strong>Source-Level Score (60% political extremity + 40% sensationalism):</strong> Distance from political center combined with tone analysis. Treats left and right extremity equally.</p>
                                     <p><strong>Excerpt-Level Scoring:</strong> Each headline is analyzed for inflammatory keywords:</p>
                                     <ul className="ml-4 space-y-1">
-                                        <li>• High intensity (3 pts): "illegal", "radical", "racist", "scandal", "corrupt", "disaster"</li>
-                                        <li>• Medium intensity (2 pts): "slams", "blasts", "demands", "condemns", "backlash"</li>
-                                        <li>• Low intensity (1 pt): "questions", "concerns", "challenges", "debate"</li>
+                                        <li>• High intensity (3 pts): &quot;illegal&quot;, &quot;radical&quot;, &quot;racist&quot;, &quot;scandal&quot;, &quot;corrupt&quot;, &quot;disaster&quot;</li>
+                                        <li>• Medium intensity (2 pts): &quot;slams&quot;, &quot;blasts&quot;, &quot;demands&quot;, &quot;condemns&quot;, &quot;backlash&quot;</li>
+                                        <li>• Low intensity (1 pt): &quot;questions&quot;, &quot;concerns&quot;, &quot;challenges&quot;, &quot;debate&quot;</li>
                                         <li>• Bonus for exclamation marks, ALL CAPS, and quoted inflammatory phrases</li>
                                     </ul>
                                     <p className="pt-2 border-t border-blue-200 dark:border-blue-800">
@@ -74,7 +74,7 @@ export default async function PolarizingPage() {
                                 </p>
                                 <ul className="space-y-1 text-sm text-yellow-800 dark:text-yellow-300">
                                     <li>• <strong>Headlines reveal bias</strong> - How sources frame the same story differently</li>
-                                    <li>• <strong>Keyword patterns</strong> - Words like "illegal", "radical", "slams" indicate emotional framing vs factual reporting</li>
+                                    <li>• <strong>Keyword patterns</strong> - Words like &quot;illegal&quot;, &quot;radical&quot;, &quot;slams&quot; indicate emotional framing vs factual reporting</li>
                                     <li>• <strong>Scored by intensity</strong> - Each headline gets a 0-100 polarization score based on inflammatory language</li>
                                     <li>• <strong>Political content only</strong> - Sports and entertainment articles filtered out to focus on political rhetoric</li>
                                     <li>• <strong>See the evidence</strong> - Highlighted keywords show exactly what makes each headline polarizing</li>

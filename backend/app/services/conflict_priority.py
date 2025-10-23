@@ -125,31 +125,33 @@ def calculate_conflict_priority(event: Event) -> float:
     score += coverage_score
     
     # ============================================================
-    # 3. RECENCY (0-25 points)
+    # 3. RECENCY (0-35 points) - INCREASED from 25 to give novelty more weight
     # ============================================================
     # Time decay: breaking news gets priority, old news fades
-    # But don't completely ignore older conflicts if they're severe
-    
+    # IMPROVED: Increased recency weight to prevent old conflicts from dominating
+    # even when they had high importance at the time of discovery
+
     now = datetime.utcnow()
     hours_since = (now - event.last_seen).total_seconds() / 3600
-    
+
     if hours_since <= 4:
-        score += 25  # Just happened - BREAKING NEWS
+        score += 35  # Just happened - BREAKING NEWS (increased from 25)
     elif hours_since <= 8:
-        score += 20  # Very recent - still breaking
+        score += 28  # Very recent - still breaking (increased from 20)
     elif hours_since <= 12:
-        score += 15  # Recent - developing story
+        score += 22  # Recent - developing story (increased from 15)
     elif hours_since <= 24:
-        score += 10  # Yesterday - still relevant
+        score += 15  # Yesterday - still relevant (increased from 10)
     elif hours_since <= 48:
-        score += 6   # Two days ago - aging but still current
+        score += 10  # Two days ago - aging but still current (increased from 6)
     elif hours_since <= 72:
-        score += 3   # Three days ago - fading
+        score += 5   # Three days ago - fading (increased from 3)
     else:
         # After 3 days, gradual decay but don't completely zero out
         # Important conflicts should still appear even if older
+        # IMPROVED: Slower decay curve - new articles get better boost
         days_old = hours_since / 24
-        decay_score = max(1, 3 - (days_old - 3) * 0.3)  # Slow decay
+        decay_score = max(0.5, 5 - (days_old - 3) * 0.2)  # Slower decay (was 0.3)
         score += decay_score
     
     return min(score, 100.0)  # Cap at 100

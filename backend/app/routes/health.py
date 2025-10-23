@@ -36,6 +36,12 @@ async def health_check(db: Session = Depends(get_db)):
         last_article = db.query(Article).order_by(Article.ingested_at.desc()).first()
         worker_last_run = last_article.ingested_at if last_article else None
 
+        # BUGFIX: Ensure timezone-aware datetime for proper frontend parsing
+        if worker_last_run:
+            from datetime import timezone
+            if worker_last_run.tzinfo is None:
+                worker_last_run = worker_last_run.replace(tzinfo=timezone.utc)
+
         if db_status == "disconnected":
             status = "unhealthy"
 

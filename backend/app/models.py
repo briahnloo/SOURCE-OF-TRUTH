@@ -33,6 +33,8 @@ class Article(Base):
     cluster_id = Column(Integer, ForeignKey("events.id"), nullable=True, index=True)
     fact_check_status = Column(String(20), nullable=True)  # 'verified', 'disputed', 'false', 'unverified'
     fact_check_flags_json = Column(Text, nullable=True)  # JSON array of FactCheckFlag objects
+    source_country = Column(String(10), nullable=True, index=True)  # ISO country code: 'US', 'GB', 'DE', etc.
+    source_region = Column(String(20), nullable=True)  # 'North America', 'Europe', 'Middle East', 'Asia', etc.
     ingested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
@@ -66,6 +68,7 @@ class Event(Base):
     first_seen = Column(DateTime, nullable=False, index=True)
     last_seen = Column(DateTime, nullable=False)
     languages_json = Column(Text)  # JSON string: ["en", "es"]
+    international_coverage_json = Column(Text, nullable=True)  # JSON-encoded InternationalCoverage data
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:

@@ -6,6 +6,7 @@ import ConfidenceMeter from './ConfidenceMeter';
 import ConflictExplanation from './ConflictExplanation';
 import EvidenceDrawer from './EvidenceDrawer';
 import FactCheckWarnings from './FactCheckWarnings';
+import InternationalCoverageComponent from './InternationalCoverage';
 import PerspectiveBadge from './PerspectiveBadge';
 import UnbiasedSummary from './UnbiasedSummary';
 
@@ -198,6 +199,11 @@ export default function EventCard({ event }: EventCardProps) {
 
                 {/* Bias Analysis and Evidence */}
                 <div className="space-y-6">
+                    {/* International Coverage */}
+                    {event.international_coverage && (
+                        <InternationalCoverageComponent coverage={event.international_coverage} />
+                    )}
+
                     {event.sources && event.sources.length > 0 && (
                         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6">
                             <BiasCompass sources={event.sources} />

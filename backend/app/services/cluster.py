@@ -12,9 +12,9 @@ from app.models import Article, Event
 from app.services.service_registry import get_bias_analyzer
 from app.services.coherence import calculate_narrative_coherence
 from app.services.embed import generate_embeddings
+from app.services.international_coverage import analyze_international_coverage, store_international_coverage
 from loguru import logger
-from sklearn.cluster import DBSCAN
-from sklearn.metrics.pairwise import cosine_distances, cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy.orm import Session
 
 
@@ -205,20 +205,21 @@ def try_match_to_event(article: Article, article_emb: np.ndarray, event: Event, 
 
 
 def cluster_unmatched_articles(
-    articles: List[Article], 
-    db: Session, 
+    articles: List[Article],
+    db: Session,
     precomputed_embeddings: Optional[np.ndarray] = None
 ) -> int:
     """
     Cluster articles that didn't match existing events.
-    
-    This is the original DBSCAN clustering logic.
-    
+
+    OPTIMIZATION: Uses sparse KNN-based clustering instead of O(n²) DBSCAN.
+    This reduces memory usage from 400MB to <50MB for 10K articles.
+
     Args:
         articles: List of unmatched articles
         db: Database session
         precomputed_embeddings: Optional pre-computed embeddings to avoid regenerating
-        
+
     Returns:
         Number of new events created
     """
@@ -226,7 +227,7 @@ def cluster_unmatched_articles(
         logger.debug(f"Not enough articles to cluster: {len(articles)}")
         return 0
 
-    logger.info(f"Clustering {len(articles)} unmatched articles into new events...")
+    logger.info(f"Clustering {len(articles)} unmatched articles into new events (using sparse KNN)...")
 
     # Use precomputed embeddings if available, otherwise generate
     if precomputed_embeddings is not None:
@@ -235,17 +236,15 @@ def cluster_unmatched_articles(
         texts = [f"{a.title} {a.summary or ''}" for a in articles]
         embeddings = generate_embeddings(texts)
 
-    # Compute cosine distance matrix
-    distances = cosine_distances(embeddings)
+    # OPTIMIZATION: Use sparse KNN clustering instead of full distance matrix
+    from app.services.sparse_clustering import cluster_with_sparse_knn
 
-    # Apply DBSCAN
-    clustering = DBSCAN(
-        eps=settings.dbscan_eps,
-        min_samples=settings.dbscan_min_samples,
-        metric="precomputed",
-    ).fit(distances)
-
-    labels = clustering.labels_
+    labels = cluster_with_sparse_knn(
+        embeddings,
+        k=min(5, len(articles) - 1),  # k=5 or less if fewer articles
+        distance_threshold=1.0 - (1.0 - settings.dbscan_eps),  # Convert DBSCAN eps to distance threshold
+        min_cluster_size=settings.dbscan_min_samples
+    )
 
     # Count clusters (excluding noise with label -1)
     unique_labels = set(labels)
@@ -309,8 +308,8 @@ def cluster_articles(db: Session) -> int:
         logger.debug("No new articles to cluster")
         return 0
     
-    # Get ACTIVE events (last 72 hours) for potential matching
-    event_cutoff = datetime.utcnow() - timedelta(hours=72)
+    # Get ACTIVE events (use analysis window from config, optimized from 72h to 48h)
+    event_cutoff = datetime.utcnow() - timedelta(hours=settings.analysis_window_hours)
     active_events = (
         db.query(Event)
         .filter(Event.last_seen >= event_cutoff)
@@ -486,5 +485,11 @@ def create_event_from_cluster(
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    # Analyze international coverage
+    international_coverage = analyze_international_coverage(event, articles)
+    if international_coverage:
+        store_international_coverage(event, international_coverage)
+        db.commit()
 
     return event

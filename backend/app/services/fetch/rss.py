@@ -24,6 +24,13 @@ RSS_FEEDS = [
     # Additional outlets
     "https://www.economist.com/the-world-this-week/rss.xml",
     "https://www.independent.co.uk/news/world/rss",
+    # International sources
+    "https://www3.nhk.or.jp/nhkworld/en/news/rss.xml",  # NHK World (Japan)
+    "https://www.abc.net.au/news/feed/51120/rss.xml",  # ABC Australia
+    "https://www.cbc.ca/cmlink/rss-topstories",  # CBC Canada
+    "https://www.euronews.com/rss?format=mrss",  # Euronews
+    "https://www.africanews.com/feed/",  # Africanews
+    "https://www.straitstimes.com/news/rss.xml",  # Straits Times (Singapore)
     # Conservative outlets
     "https://moxie.foxnews.com/google-publisher/latest.xml",
     "https://www.wsj.com/xml/rss/3_7085.xml",

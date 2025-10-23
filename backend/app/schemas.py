@@ -49,7 +49,26 @@ class SourceErrorStats(BaseModel):
     disputed_count: int
     total_articles: int
     error_rate: float
-    impact_score: float
+
+
+class InternationalSource(BaseModel):
+    """International news source"""
+    domain: str
+    country: str
+    region: str
+    political_bias: Dict[str, float]
+    article_count: int
+
+
+class InternationalCoverage(BaseModel):
+    """International coverage analysis"""
+    has_international: bool
+    source_count: int
+    sources: List[InternationalSource]
+    regional_breakdown: Dict[str, int]
+    political_distribution: Dict[str, float]
+    differs_from_us: bool
+    coverage_gap_score: float
 
 
 class FlaggedArticlesResponse(BaseModel):
@@ -144,6 +163,26 @@ class BiasCompass(BaseModel):
     detail: Dict[str, float]
 
 
+class InternationalSourceResponse(BaseModel):
+    """Represents an international news source"""
+    domain: str
+    country: str
+    region: str
+    article_count: int
+    political_bias: Optional[Dict[str, float]] = None  # {"left": 0.3, "center": 0.6, "right": 0.1}
+
+
+class InternationalCoverageResponse(BaseModel):
+    """Coverage metrics for international sources of an event"""
+    has_international: bool
+    source_count: int = 0
+    sources: List[InternationalSourceResponse] = []
+    regional_breakdown: Dict[str, int] = {}  # {"Europe": 5, "Asia": 3}
+    political_distribution: Dict[str, float] = {}  # {"left": 0.3, "center": 0.5, "right": 0.2}
+    coverage_gap_score: float = 0.0  # 0-1, higher = more difference between US and international
+    differs_from_us: bool = False
+
+
 class EventBase(BaseModel):
     id: int
     summary: str
@@ -158,6 +197,7 @@ class EventBase(BaseModel):
     category: Optional[str] = None
     category_confidence: Optional[float] = None
     importance_score: Optional[float] = None  # Multi-factor importance score (0-100)
+    international_coverage: Optional[InternationalCoverageResponse] = None
     first_seen: datetime
     last_seen: datetime
 

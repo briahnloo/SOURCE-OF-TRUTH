@@ -18,6 +18,7 @@ from app.schemas import (
     FactCheckFlag,
     FlaggedArticle,
     FlaggedArticlesResponse,
+    InternationalCoverageResponse,
     NarrativePerspective,
     PolarizingExcerpt,
     PolarizingSource,
@@ -28,6 +29,10 @@ from app.schemas import (
     TopSource,
 )
 from app.services.service_registry import get_bias_analyzer
+from app.services.international_coverage import (
+    analyze_international_coverage,
+    load_international_coverage,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
@@ -35,20 +40,117 @@ from sqlalchemy.orm import Session
 router = APIRouter()
 
 
+def get_international_coverage_for_event(event: Event, articles: list, db: Session) -> Optional[InternationalCoverageResponse]:
+    """Parse international coverage data for an event"""
+    if not event.international_coverage_json:
+        return None
+    
+    try:
+        coverage = load_international_coverage(event)
+        if not coverage:
+            return None
+        
+        # Convert to response format
+        sources = []
+        for source in coverage.sources:
+            sources.append({
+                "domain": source.domain,
+                "country": source.country,
+                "region": source.region,
+                "article_count": source.article_count,
+                "political_bias": source.political_bias
+            })
+        
+        return InternationalCoverageResponse(
+            has_international=coverage.has_international,
+            source_count=coverage.source_count,
+            sources=sources,
+            regional_breakdown=coverage.regional_breakdown,
+            political_distribution=coverage.political_distribution,
+            coverage_gap_score=coverage.coverage_gap_score,
+            differs_from_us=coverage.differs_from_us
+        )
+    except Exception as e:
+        print(f"Error parsing international coverage: {e}")
+        return None
+
+
 def create_event_source_with_bias(article: Article) -> EventSource:
     """Create EventSource with political bias data"""
     bias_analyzer = get_bias_analyzer()
     bias = bias_analyzer.get_source_bias(article.source)
-    
+
     political_bias = None
     if bias:
         political_bias = bias.political
-    
+
     return EventSource(
         domain=article.source,
         title=article.title,
         url=article.url,
         political_bias=political_bias
+    )
+
+
+def get_international_coverage_for_event(event: Event, articles: list, db: Session) -> Optional[InternationalCoverageResponse]:
+    """
+    Get international coverage data for an event
+
+    Returns:
+        InternationalCoverageResponse if international sources exist and importance_score > 70,
+        None otherwise
+    """
+    # Only show international coverage for high-importance events
+    if not event.importance_score or event.importance_score < 70:
+        return None
+
+    # Try to load from cached JSON first
+    if event.international_coverage_json:
+        coverage = international_coverage_from_json(event.international_coverage_json)
+        if coverage:
+            return InternationalCoverageResponse(
+                has_international=coverage.has_international,
+                source_count=coverage.source_count,
+                us_source_count=coverage.us_source_count,
+                international_source_count=coverage.international_source_count,
+                sources=[
+                    {"domain": s.domain, "country": s.country, "region": s.region,
+                     "article_count": s.article_count, "political_bias": s.political_bias}
+                    for s in coverage.sources
+                ],
+                regional_breakdown=coverage.regional_breakdown,
+                political_distribution=coverage.political_distribution,
+                coverage_gap_score=coverage.coverage_gap_score,
+                differs_from_us=coverage.differs_from_us,
+            )
+
+    # Otherwise analyze on the fly
+    bias_analyzer = get_bias_analyzer()
+    source_biases = {}
+    for article in articles:
+        bias = bias_analyzer.get_source_bias(article.source)
+        if bias:
+            source_biases[article.source] = bias.political
+
+    coverage = analyze_international_coverage(articles, source_biases)
+
+    if not coverage.has_international:
+        return None
+
+    return InternationalCoverageResponse(
+        has_international=coverage.has_international,
+        source_count=coverage.source_count,
+        us_source_count=coverage.us_source_count,
+        international_source_count=coverage.international_source_count,
+        sources=[
+            {"domain": s.domain, "country": s.country, "region": s.region,
+             "article_count": s.article_count, "political_bias": s.political_bias}
+            for s in coverage.sources
+        ],
+        regional_breakdown=coverage.regional_breakdown,
+        political_distribution=coverage.political_distribution,
+        coverage_gap_score=coverage.coverage_gap_score,
+        differs_from_us=coverage.differs_from_us,
     )
 
 
@@ -115,27 +217,99 @@ async def get_events(
     # Get total count
     total = query.count()
 
-    # Apply pagination and ordering - importance first, then truth score, then recency
-    events = (
-        query.order_by(
-            Event.importance_score.desc(),  # Primary: importance
-            Event.truth_score.desc(),        # Secondary: verification
-            Event.last_seen.desc()           # Tertiary: recency
-        )
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+    # IMPROVED SORTING: Balance importance with novelty/recency
+    # Fetch all matching events (will be filtered/paginated in Python for better control)
+    all_events = query.all()
 
-    # Build response with sources
+    # Calculate balanced score combining importance + recency boost
+    from datetime import datetime, timedelta
+
+    def calculate_balanced_score(event: Event) -> float:
+        """
+        Balanced scoring combining importance, verification, and recency.
+
+        Weights:
+        - Importance (40%): What topics matter most
+        - Truth/Confidence (30%): How verified is it
+        - Recency boost (30%): Newer events get preference
+
+        This prevents old articles from permanently dominating just because
+        they have high importance scores.
+        """
+        importance_weight = 0.4
+        confidence_weight = 0.3
+        recency_weight = 0.3
+
+        # 1. Normalize importance (0-100)
+        importance_score = (event.importance_score or 0) / 100.0
+
+        # 2. Normalize truth score (0-100)
+        truth_score = (event.truth_score or 0) / 100.0
+
+        # 3. Recency boost: Decay older events, boost newer ones
+        now = datetime.utcnow()
+        hours_old = (now - event.last_seen).total_seconds() / 3600
+
+        # Recency decay function:
+        # Recent (0-6h): +30 points
+        # 6-12h: +20 points
+        # 12-24h: +10 points
+        # 24-48h: +5 points
+        # >48h: gradual decay
+        if hours_old <= 6:
+            recency_score = 0.95  # Very recent - high boost
+        elif hours_old <= 12:
+            recency_score = 0.75  # Recent - moderate boost
+        elif hours_old <= 24:
+            recency_score = 0.5   # A day old - mild boost
+        elif hours_old <= 48:
+            recency_score = 0.3   # Two days old - small boost
+        else:
+            # After 48 hours, gradual decay: 0.3 - 0.001 per hour
+            decay = max(0.05, 0.3 - (hours_old - 48) * 0.001)
+            recency_score = decay
+
+        # Combine weighted scores
+        balanced_score = (
+            importance_weight * importance_score +
+            confidence_weight * truth_score +
+            recency_weight * recency_score
+        )
+
+        return balanced_score
+
+    # Sort with balanced scoring
+    all_events.sort(key=calculate_balanced_score, reverse=True)
+
+    # Apply pagination after sorting
+    events = all_events[offset:offset + limit]
+
+    # Build response with sources - PERFORMANCE OPTIMIZATION: Batch load articles
+    # Instead of N+1 queries (1 per event), we get all articles in one query
     results = []
-    for event in events:
-        articles = (
+
+    # Get all event IDs
+    event_ids = [e.id for e in events]
+
+    # Batch load all articles for these events in a single query
+    if event_ids:
+        all_articles = (
             db.query(Article)
-            .filter(Article.cluster_id == event.id)
-            .limit(10)  # Top 10 sources
+            .filter(Article.cluster_id.in_(event_ids))
             .all()
         )
+        # Group articles by event ID
+        articles_by_event = {}
+        for article in all_articles:
+            if article.cluster_id not in articles_by_event:
+                articles_by_event[article.cluster_id] = []
+            if len(articles_by_event[article.cluster_id]) < 10:  # Top 10 sources
+                articles_by_event[article.cluster_id].append(article)
+    else:
+        articles_by_event = {}
+
+    for event in events:
+        articles = articles_by_event.get(event.id, [])
         sources = [create_event_source_with_bias(a) for a in articles]
 
         # Deserialize conflict explanation and bias compass
@@ -145,6 +319,9 @@ async def get_events(
         bias_compass = parse_json_body(
             event.bias_compass_json, BiasCompass, "bias_compass"
         )
+
+        # Get international coverage if applicable
+        international_coverage = get_international_coverage_for_event(event, articles, db)
 
         event_dict = {
             "id": event.id,
@@ -160,6 +337,7 @@ async def get_events(
             "category": event.category,
             "category_confidence": event.category_confidence,
             "importance_score": event.importance_score,
+            "international_coverage": international_coverage,
             "first_seen": event.first_seen,
             "last_seen": event.last_seen,
             "sources": sources,
@@ -218,14 +396,31 @@ async def get_conflict_events(
     )
 
     # ADDITIONAL FILTER: Check for political diversity in results
+    # PERFORMANCE OPTIMIZATION: Batch load articles instead of N+1 queries
     results = []
-    for event in events:
-        articles = (
+
+    # Get all event IDs
+    event_ids = [e.id for e in events]
+
+    # Batch load all articles for these events in a single query
+    if event_ids:
+        all_articles = (
             db.query(Article)
-            .filter(Article.cluster_id == event.id)
-            .limit(10)
+            .filter(Article.cluster_id.in_(event_ids))
             .all()
         )
+        # Group articles by event ID
+        articles_by_event = {}
+        for article in all_articles:
+            if article.cluster_id not in articles_by_event:
+                articles_by_event[article.cluster_id] = []
+            if len(articles_by_event[article.cluster_id]) < 10:  # Top 10 sources
+                articles_by_event[article.cluster_id].append(article)
+    else:
+        articles_by_event = {}
+
+    for event in events:
+        articles = articles_by_event.get(event.id, [])
         
         # Filter out non-political topics by content (regardless of category)
         summary_lower = event.summary.lower()
@@ -412,6 +607,15 @@ async def get_stats(db: Session = Depends(get_db)):
     )
     last_ingestion = last_article.ingested_at if last_article else None
 
+    # BUGFIX: Ensure timezone-aware datetime for proper frontend parsing
+    # The backend stores UTC times without timezone info, which causes JavaScript
+    # to interpret them as local time, resulting in 7-hour offset errors in PST.
+    # Solution: Convert to timezone-aware UTC before serialization.
+    if last_ingestion:
+        from datetime import timezone
+        if last_ingestion.tzinfo is None:
+            last_ingestion = last_ingestion.replace(tzinfo=timezone.utc)
+
     # Get unique sources count
     sources_count = db.query(func.count(func.distinct(Article.source))).scalar() or 0
 
@@ -492,13 +696,62 @@ async def get_flagged_articles(
     # Get total count
     total = query.count()
     
-    # Get paginated articles
-    articles = (
-        query.order_by(Article.timestamp.desc())
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+    # IMPROVED SORTING: Balance recency with severity of false/disputed claims
+    # Fetch all matching articles and apply Python-based scoring
+    all_articles = query.all()
+
+    def calculate_flagged_score(article: Article) -> float:
+        """
+        Score flagged articles by severity and recency.
+
+        Weights:
+        - Severity (60%): False claims are more important than disputed
+        - Recency (40%): Newer false claims are more urgent to highlight
+
+        This prevents very old false claims from dominating while still
+        showing newer important errors.
+        """
+        from datetime import datetime
+
+        severity_weight = 0.6
+        recency_weight = 0.4
+
+        # 1. Severity scoring (0-1)
+        if article.fact_check_status == "false":
+            severity_score = 1.0  # False claims are most critical
+        elif article.fact_check_status == "disputed":
+            severity_score = 0.6  # Disputed claims are less critical
+        else:
+            severity_score = 0.3  # Default fallback
+
+        # 2. Recency boost (0-1) - decay over time
+        now = datetime.utcnow()
+        hours_old = (now - article.timestamp).total_seconds() / 3600
+
+        if hours_old <= 24:  # Within 1 day
+            recency_score = 1.0
+        elif hours_old <= 48:  # Within 2 days
+            recency_score = 0.8
+        elif hours_old <= 72:  # Within 3 days
+            recency_score = 0.6
+        else:
+            # After 3 days, gradual decay
+            days_old = hours_old / 24
+            recency_score = max(0.1, 0.6 - (days_old - 3) * 0.02)
+
+        # Combine weighted scores
+        flagged_score = (
+            severity_weight * severity_score +
+            recency_weight * recency_score
+        )
+
+        return flagged_score
+
+    # Sort with balanced scoring
+    all_articles.sort(key=calculate_flagged_score, reverse=True)
+
+    # Apply pagination after sorting
+    articles = all_articles[offset:offset + limit]
     
     # Build flagged article objects
     flagged_articles = []

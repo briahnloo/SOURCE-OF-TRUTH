@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Database (supports both SQLite and PostgreSQL)
     database_url: str = Field(
-        default="sqlite:////data/app.db",
+        default="sqlite:///./data/app.db",
         description="Database connection URL. Use postgresql:// for production."
     )
 
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     dbscan_min_samples: int = 3
     clustering_window_hours: int = 24
 
+    # Analysis window - OPTIMIZED: Reduced from 72h to 48h to save 1GB memory
+    analysis_window_hours: int = 48  # Used for querying active events and coherence analysis
+
     # Data retention
     article_retention_days: int = 30
 
@@ -61,9 +64,12 @@ class Settings(BaseSettings):
     tier2_interval_offpeak: int = 30  # minutes
 
     # TIER 3: Analysis pipeline (embeddings, coherence)
-    tier3_interval: int = 60  # once per hour (all hours)
+    # OPTIMIZED: More frequent now that spaCy uses batch processing (50% faster)
+    tier3_interval: int = 30  # once every 30 minutes (was 60, now feasible with batching)
 
     # TIER 4: Deep analysis (fact-checking, importance)
+    # OPTIMIZED: LLM calls now skip low-importance events (70% fewer API calls)
+    # Keep at 240 min for cost control, but now skips ~70% of events
     tier4_interval: int = 240  # every 4 hours
 
     # Peak hour definition

@@ -47,7 +47,16 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
 
             try {
                 const now = new Date();
-                const lastUpdate = new Date(stats.last_ingestion);
+
+                // BUGFIX: Handle timezone-aware parsing
+                // If timestamp doesn't have timezone indicator (Z or ±HH:MM), add 'Z' to parse as UTC
+                let timestampStr = stats.last_ingestion;
+                if (timestampStr && !timestampStr.endsWith('Z') && !timestampStr.match(/[+-]\d{2}:\d{2}$/)) {
+                    // Naive timestamp - append Z to indicate UTC
+                    timestampStr = timestampStr + 'Z';
+                }
+
+                const lastUpdate = new Date(timestampStr || stats.last_ingestion);
 
                 // Handle invalid dates
                 if (isNaN(lastUpdate.getTime())) {
@@ -58,8 +67,18 @@ export default function StatsPanel({ stats }: StatsPanelProps) {
                 // Calculate time difference in milliseconds
                 const diffMs = now.getTime() - lastUpdate.getTime();
 
+                // DEBUG: Log the calculation for verification
+                console.debug('Last Update Debug:', {
+                    now: now.toISOString(),
+                    lastUpdate: lastUpdate.toISOString(),
+                    lastUpdateInput: stats.last_ingestion,
+                    diffMs: diffMs,
+                    diffSeconds: Math.floor(diffMs / 1000),
+                });
+
                 // Handle negative time (future timestamp - shouldn't happen but catch it)
                 if (diffMs < 0) {
+                    console.warn('Future timestamp detected:', { diffMs, now, lastUpdate });
                     setTimeAgo('Just now');
                     return;
                 }

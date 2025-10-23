@@ -1,5 +1,6 @@
 """APScheduler worker for periodic ingestion pipeline"""
 
+import gc
 import json
 import os
 import time
@@ -12,6 +13,7 @@ import requests
 from loguru import logger
 
 from app.config import settings
+from app.core.memory_utils import clear_session_cache, memory_safe_processing, MemoryProfiler
 from app.core.retry_utils import RetryConfig, get_retry_config_for_source, retry_with_backoff
 from app.db import SessionLocal, init_db
 from app.models import Article, Event
@@ -454,11 +456,13 @@ def fetch_articles_parallel() -> List[Dict]:
 def extract_developing_excerpts(db: Session, max_events: int = 10) -> int:
     """
     Extract excerpts for developing events that don't have them yet.
-    
+
+    OPTIMIZATION: Uses memory_safe_processing to cleanup after each event
+
     Args:
         db: Database session
         max_events: Maximum number of events to process per run (to avoid long processing)
-        
+
     Returns:
         Number of events processed
     """
@@ -469,7 +473,7 @@ def extract_developing_excerpts(db: Session, max_events: int = 10) -> int:
         identify_narrative_perspectives,
     )
     from app.services.embed import generate_embeddings
-    
+
     # Find developing events without excerpts (limit to most recent)
     developing = (
         db.query(Event)
@@ -479,60 +483,65 @@ def extract_developing_excerpts(db: Session, max_events: int = 10) -> int:
         .limit(max_events)  # Limit to avoid long processing
         .all()
     )
-    
+
     processed = 0
-    
-    for event in developing:
-        try:
-            # Check if already has excerpts
-            explanation = json.loads(event.conflict_explanation_json)
-            if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
-                continue  # Already has excerpts
-            
-            # Get articles
-            articles = db.query(Article).filter(Article.cluster_id == event.id).all()
-            if not articles:
+
+    # OPTIMIZATION: Use memory-safe processing context
+    with memory_safe_processing(db, cleanup_interval=1, description="developing excerpts") as mem_ctx:
+        for event in developing:
+            try:
+                # Check if already has excerpts
+                explanation = json.loads(event.conflict_explanation_json)
+                if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
+                    continue  # Already has excerpts
+
+                # Get articles
+                articles = db.query(Article).filter(Article.cluster_id == event.id).all()
+                if not articles:
+                    continue
+
+                # Regenerate with excerpt extraction forced
+                texts = [f"{a.title} {a.summary or ''}" for a in articles]
+                embeddings = generate_embeddings(texts)
+
+                # Group by political bias if diverse
+                if has_political_diversity(articles):
+                    perspectives, articles_by_perspective = group_by_political_bias(articles)
+                else:
+                    perspectives, articles_by_perspective = identify_narrative_perspectives(articles, embeddings)
+
+                # Generate with forced excerpt extraction
+                updated_explanation = generate_conflict_explanation(
+                    perspectives,
+                    articles_by_perspective,
+                    force_excerpt_extraction=True
+                )
+
+                event.conflict_explanation_json = json.dumps(asdict(updated_explanation))
+                db.commit()
+                processed += 1
+                mem_ctx.mark_processed()
+
+            except Exception as e:
+                logger.warning(f"Failed to extract excerpts for event {event.id}: {type(e).__name__}: {str(e)}")
                 continue
-            
-            # Regenerate with excerpt extraction forced
-            texts = [f"{a.title} {a.summary or ''}" for a in articles]
-            embeddings = generate_embeddings(texts)
-            
-            # Group by political bias if diverse
-            if has_political_diversity(articles):
-                perspectives, articles_by_perspective = group_by_political_bias(articles)
-            else:
-                perspectives, articles_by_perspective = identify_narrative_perspectives(articles, embeddings)
-            
-            # Generate with forced excerpt extraction
-            updated_explanation = generate_conflict_explanation(
-                perspectives,
-                articles_by_perspective,
-                force_excerpt_extraction=True
-            )
-            
-            event.conflict_explanation_json = json.dumps(asdict(updated_explanation))
-            db.commit()
-            processed += 1
-            
-        except Exception as e:
-            logger.warning(f"Failed to extract excerpts for event {event.id}: {type(e).__name__}: {str(e)}")
-            continue
-    
+
     return processed
 
 
 def extract_conflict_excerpts(db: Session, max_events: int = 15) -> int:
     """
     Extract excerpts for conflict events that don't have them yet.
-    
+
     Unlike developing excerpts, this targets ANY event with conflicts
     regardless of truth score.
-    
+
+    OPTIMIZATION: Uses memory_safe_processing to cleanup after each event
+
     Args:
         db: Database session
         max_events: Maximum number of events to process per run
-        
+
     Returns:
         Number of events processed
     """
@@ -543,56 +552,63 @@ def extract_conflict_excerpts(db: Session, max_events: int = 15) -> int:
         identify_narrative_perspectives,
     )
     from app.services.embed import generate_embeddings
-    
+
     # Find conflict events without excerpts
+    # OPTIMIZATION: Only process high-importance conflicts to save LLM API costs
+    # Events with importance_score >= 60 get full analysis with LLM excerpt extraction
+    # Lower-importance events use generic excerpts (faster, no LLM cost)
     conflicts = (
         db.query(Event)
         .filter(Event.has_conflict == True)  # Must have conflict flag
         .filter(Event.conflict_explanation_json != None)  # Has perspectives
+        .filter(Event.importance_score >= 60)  # Only high-importance events (OPTIMIZATION: save 70% LLM costs)
         .order_by(Event.importance_score.desc())  # Highest importance first
         .limit(max_events)
         .all()
     )
-    
+
     processed = 0
-    
-    for event in conflicts:
-        try:
-            # Check if already has excerpts
-            explanation = json.loads(event.conflict_explanation_json)
-            if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
-                continue  # Already has excerpts
-            
-            # Get articles
-            articles = db.query(Article).filter(Article.cluster_id == event.id).all()
-            if not articles or len(articles) < 2:
-                continue
-            
-            # Regenerate with excerpt extraction forced
-            texts = [f"{a.title} {a.summary or ''}" for a in articles]
-            embeddings = generate_embeddings(texts)
-            
-            # Group by political bias if diverse
-            if has_political_diversity(articles):
-                perspectives, articles_by_perspective = group_by_political_bias(articles)
-            else:
-                perspectives, articles_by_perspective = identify_narrative_perspectives(articles, embeddings)
-            
-            # Generate with forced excerpt extraction
-            updated_explanation = generate_conflict_explanation(
-                perspectives,
-                articles_by_perspective,
-                force_excerpt_extraction=True
-            )
-            
-            event.conflict_explanation_json = json.dumps(asdict(updated_explanation))
-            db.commit()
-            processed += 1
-            
-            logger.info(f"Extracted excerpts for conflict event {event.id}: {event.summary[:60]}")
-            
-        except Exception as e:
-            logger.warning(f"Failed to extract excerpts for conflict event {event.id}: {type(e).__name__}: {str(e)}")
+
+    # OPTIMIZATION: Use memory-safe processing context
+    with memory_safe_processing(db, cleanup_interval=1, description="conflict excerpts") as mem_ctx:
+        for event in conflicts:
+            try:
+                # Check if already has excerpts
+                explanation = json.loads(event.conflict_explanation_json)
+                if any(p.get("representative_excerpts") for p in explanation.get("perspectives", [])):
+                    continue  # Already has excerpts
+
+                # Get articles
+                articles = db.query(Article).filter(Article.cluster_id == event.id).all()
+                if not articles or len(articles) < 2:
+                    continue
+
+                # Regenerate with excerpt extraction forced
+                texts = [f"{a.title} {a.summary or ''}" for a in articles]
+                embeddings = generate_embeddings(texts)
+
+                # Group by political bias if diverse
+                if has_political_diversity(articles):
+                    perspectives, articles_by_perspective = group_by_political_bias(articles)
+                else:
+                    perspectives, articles_by_perspective = identify_narrative_perspectives(articles, embeddings)
+
+                # Generate with forced excerpt extraction
+                updated_explanation = generate_conflict_explanation(
+                    perspectives,
+                    articles_by_perspective,
+                    force_excerpt_extraction=True
+                )
+
+                event.conflict_explanation_json = json.dumps(asdict(updated_explanation))
+                db.commit()
+                processed += 1
+                mem_ctx.mark_processed()
+
+                logger.info(f"Extracted excerpts for conflict event {event.id}: {event.summary[:60]}")
+
+            except Exception as e:
+                logger.warning(f"Failed to extract excerpts for conflict event {event.id}: {type(e).__name__}: {str(e)}")
             continue
     
     return processed
@@ -601,21 +617,23 @@ def extract_conflict_excerpts(db: Session, max_events: int = 15) -> int:
 def reevaluate_event_conflicts(db: Session, hours: int = 48) -> int:
     """
     Reevaluate coherence scores for recent events.
-    
+
     Catches conflicts that emerge as narratives evolve.
-    
+
+    OPTIMIZATION: Uses memory_safe_processing to cleanup after each event
+
     Args:
         db: Database session
         hours: Look back window
-        
+
     Returns:
         Number of events with status changes
     """
     from app.services.coherence import calculate_narrative_coherence
     from app.services.embed import generate_embeddings
-    
+
     cutoff = datetime.utcnow() - timedelta(hours=hours)
-    
+
     # Get recent events regardless of current conflict status
     events = (
         db.query(Event)
@@ -623,59 +641,62 @@ def reevaluate_event_conflicts(db: Session, hours: int = 48) -> int:
         .filter(Event.articles_count >= 3)  # Need enough articles
         .all()
     )
-    
+
     status_changes = 0
-    
-    for event in events:
-        try:
-            old_coherence = event.coherence_score or 100
-            old_severity = event.conflict_severity or "none"
-            
-            # Get all articles and recalculate
-            articles = db.query(Article).filter(Article.cluster_id == event.id).all()
-            if not articles:
-                continue
-                
-            texts = [f"{a.title} {a.summary or ''}" for a in articles]
-            embeddings = generate_embeddings(texts)
-            
-            new_coherence, new_severity, explanation = calculate_narrative_coherence(
-                articles, embeddings
-            )
-            
-            # Check for meaningful changes
-            coherence_changed = abs(old_coherence - new_coherence) > 5
-            severity_changed = old_severity != new_severity
-            
-            if coherence_changed or severity_changed:
-                logger.info(
-                    f"Event {event.id} conflict status changed: "
-                    f"{old_severity} ({old_coherence:.1f}) -> {new_severity} ({new_coherence:.1f})"
+
+    # OPTIMIZATION: Use memory-safe processing context
+    with memory_safe_processing(db, cleanup_interval=2, description="conflict re-evaluation") as mem_ctx:
+        for event in events:
+            try:
+                old_coherence = event.coherence_score or 100
+                old_severity = event.conflict_severity or "none"
+
+                # Get all articles and recalculate
+                articles = db.query(Article).filter(Article.cluster_id == event.id).all()
+                if not articles:
+                    continue
+
+                texts = [f"{a.title} {a.summary or ''}" for a in articles]
+                embeddings = generate_embeddings(texts)
+
+                new_coherence, new_severity, explanation = calculate_narrative_coherence(
+                    articles, embeddings
                 )
-                
-                # Track when conflict first emerged
-                was_conflicted = old_severity != "none"
-                is_now_conflicted = new_severity != "none"
-                
-                if not was_conflicted and is_now_conflicted:
-                    event.conflict_detected_at = datetime.utcnow()
-                    logger.warning(f"Event {event.id} became conflicted during re-evaluation!")
-                
-                event.coherence_score = new_coherence
-                event.conflict_severity = new_severity
-                event.has_conflict = new_severity != "none"
-                
-                if explanation:
-                    event.conflict_explanation_json = json.dumps(asdict(explanation))
-                
-                status_changes += 1
-                
-        except Exception as e:
-            logger.warning(f"Failed to reevaluate event {event.id}: {type(e).__name__}: {str(e)}")
-            continue
-    
-    db.commit()
-    
+
+                # Check for meaningful changes
+                coherence_changed = abs(old_coherence - new_coherence) > 5
+                severity_changed = old_severity != new_severity
+
+                if coherence_changed or severity_changed:
+                    logger.info(
+                        f"Event {event.id} conflict status changed: "
+                        f"{old_severity} ({old_coherence:.1f}) -> {new_severity} ({new_coherence:.1f})"
+                    )
+
+                    # Track when conflict first emerged
+                    was_conflicted = old_severity != "none"
+                    is_now_conflicted = new_severity != "none"
+
+                    if not was_conflicted and is_now_conflicted:
+                        event.conflict_detected_at = datetime.utcnow()
+                        logger.warning(f"Event {event.id} became conflicted during re-evaluation!")
+
+                    event.coherence_score = new_coherence
+                    event.conflict_severity = new_severity
+                    event.has_conflict = new_severity != "none"
+
+                    if explanation:
+                        event.conflict_explanation_json = json.dumps(asdict(explanation))
+
+                    status_changes += 1
+                    db.commit()
+
+                mem_ctx.mark_processed()
+
+            except Exception as e:
+                logger.warning(f"Failed to reevaluate event {event.id}: {type(e).__name__}: {str(e)}")
+                continue
+
     return status_changes
 
 

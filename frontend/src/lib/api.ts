@@ -14,6 +14,18 @@ function getApiUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 }
 
+// Check if backend is available
+async function isBackendAvailable(): Promise<boolean> {
+    try {
+        const response = await fetch(`${getApiUrl()}/health`, {
+            timeout: 5000,
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
 export interface EventSource {
     domain: string;
     title: string;
@@ -53,6 +65,24 @@ export interface BiasCompass {
     detail: { surface: number; deep: number };
 }
 
+export interface InternationalSource {
+    domain: string;
+    country: string;
+    region: string;
+    article_count: number;
+    political_bias: { left: number; center: number; right: number };
+}
+
+export interface InternationalCoverage {
+    has_international: boolean;
+    source_count: number;
+    sources: InternationalSource[];
+    regional_breakdown: { [region: string]: number };
+    political_distribution: { left: number; center: number; right: number };
+    coverage_gap_score: number;
+    differs_from_us: boolean;
+}
+
 export interface Event {
     id: number;
     summary: string;
@@ -66,6 +96,8 @@ export interface Event {
     bias_compass?: BiasCompass;
     category?: string;
     category_confidence?: number;
+    importance_score?: number;
+    international_coverage?: InternationalCoverage;
     first_seen: string;
     last_seen: string;
     sources?: EventSource[];
@@ -215,9 +247,18 @@ class APIError extends Error {
 async function fetchAPI<T>(endpoint: string): Promise<T> {
     const url = `${getApiUrl()}${endpoint}`;
 
+    // Check if backend is available first (only during SSR)
+    if (typeof window === 'undefined') {
+        const isAvailable = await isBackendAvailable();
+        if (!isAvailable) {
+            throw new Error(`Backend is not available. Please ensure the backend service is running and accessible at ${getApiUrl()}.`);
+        }
+    }
+
     try {
         const response = await fetch(url, {
             cache: 'no-store',  // Disable Next.js caching for dynamic data
+            timeout: 10000,  // 10 second timeout
         });
 
         if (!response.ok) {
@@ -232,6 +273,10 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
     } catch (error) {
         if (error instanceof APIError) {
             throw error;
+        }
+        // More specific error handling
+        if (error instanceof TypeError && error.message.includes('fetch failed')) {
+            throw new Error(`Network error: Unable to connect to API at ${url}. Please ensure the backend is running.`);
         }
         throw new Error(`Failed to fetch from API: ${error}`);
     }

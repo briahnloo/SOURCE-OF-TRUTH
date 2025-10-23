@@ -118,6 +118,19 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
         }
     };
 
+    const isInternationalPerspective = (perspective: NarrativePerspective) => {
+        // Check if sources are international (non-US domains)
+        const internationalDomains = [
+            'bbc.co.uk', 'feeds.bbci.co.uk', 'aljazeera.com', 'dw.com', 'rss.dw.com',
+            'france24.com', 'nhk.or.jp', 'www3.nhk.or.jp', 'abc.net.au', 'cbc.ca',
+            'euronews.com', 'africanews.com', 'straitstimes.com'
+        ];
+
+        return perspective.sources.some(source =>
+            internationalDomains.some(domain => source.includes(domain))
+        );
+    };
+
     const getPoliticalIcon = (leaning: string) => {
         switch (leaning) {
             case 'left':
@@ -294,6 +307,19 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                             <div>
                                                 <span className="text-base font-bold text-gray-900 dark:text-white block">
                                                     {getPoliticalLabel(perspective.political_leaning)}
+                                                </span>
+                                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {perspective.article_count} source
+                                                    {perspective.article_count > 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : isInternationalPerspective(perspective) ? (
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-2xl">🌍</span>
+                                            <div>
+                                                <span className="text-base font-bold text-gray-900 dark:text-white block">
+                                                    International Sources
                                                 </span>
                                                 <span className="text-xs text-gray-600 dark:text-gray-400">
                                                     {perspective.article_count} source

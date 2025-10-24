@@ -16,7 +16,7 @@ services:
     name: truthlayer-backend
     runtime: docker
     region: oregon
-    plan: free
+    plan: standard
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health/ready
@@ -35,7 +35,6 @@ services:
       - key: DISCORD_WEBHOOK_URL
         sync: false
       - key: ENABLE_SCHEDULER
-        value: "false"
-        # Set to "false" on free tier to avoid memory issues
-        # Use POST /health/ingest to manually trigger data ingestion
+        value: "true"
+        # Enabled on Standard plan for automatic data ingestion
 

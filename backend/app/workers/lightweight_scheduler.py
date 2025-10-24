@@ -18,13 +18,23 @@ from app.services.score import score_recent_events
 # Import only lightweight fetchers
 from app.services.fetch.rss import fetch_rss_articles
 from app.services.fetch.newsapi import fetch_newsapi_articles
+from app.services.fetch.gdelt import fetch_gdelt_articles
+from app.services.fetch.reddit import fetch_reddit_articles
+from app.services.fetch.ngos_usgs_who_nasa_ocha import fetch_all_ngo_gov
 
 
 def run_lightweight_ingestion() -> Dict:
     """
-    Lightweight ingestion pipeline optimized for Render free tier.
-    
-    Only fetches from 2 sources (RSS + NewsAPI) to stay within limits.
+    Lightweight ingestion pipeline optimized for Render.
+
+    Fetches from 5+ free sources that don't require API keys or billing:
+    1. RSS feeds (Reuters, BBC, Guardian)
+    2. NewsAPI (if key available)
+    3. GDELT (breaking news, no key required)
+    4. Reddit (news and worldnews subreddits)
+    5. NGO/Gov sources (USGS earthquakes, WHO, UN OCHA, ReliefWeb)
+
+    This ensures data ingestion works independently without external API dependencies.
     """
     logger.info("🚀 Starting lightweight ingestion pipeline...")
     
@@ -65,7 +75,34 @@ def run_lightweight_ingestion() -> Dict:
             except Exception as e:
                 logger.error(f"❌ NewsAPI failed: {e}")
                 stats["errors"].append(f"NewsAPI: {str(e)}")
-        
+
+        # GDELT (no API key needed, breaking news)
+        try:
+            gdelt_articles = fetch_gdelt_articles(minutes=60)
+            all_articles.extend(gdelt_articles)
+            logger.info(f"✅ GDELT: {len(gdelt_articles)} articles")
+        except Exception as e:
+            logger.error(f"❌ GDELT failed: {e}")
+            stats["errors"].append(f"GDELT: {str(e)}")
+
+        # Reddit (no API key needed)
+        try:
+            reddit_articles = fetch_reddit_articles()
+            all_articles.extend(reddit_articles)
+            logger.info(f"✅ Reddit: {len(reddit_articles)} articles")
+        except Exception as e:
+            logger.error(f"❌ Reddit failed: {e}")
+            stats["errors"].append(f"Reddit: {str(e)}")
+
+        # NGO/Government sources (USGS earthquakes, WHO, UN OCHA, ReliefWeb - no keys needed)
+        try:
+            ngo_articles = fetch_all_ngo_gov()
+            all_articles.extend(ngo_articles)
+            logger.info(f"✅ NGO/Gov sources: {len(ngo_articles)} articles")
+        except Exception as e:
+            logger.error(f"❌ NGO/Gov failed: {e}")
+            stats["errors"].append(f"NGO/Gov: {str(e)}")
+
         stats["articles_fetched"] = len(all_articles)
         
         if not all_articles:

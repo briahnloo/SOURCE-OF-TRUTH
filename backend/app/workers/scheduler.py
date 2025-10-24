@@ -720,7 +720,7 @@ def run_ingestion_pipeline() -> None:
     if os.getenv("RENDER", "").lower() == "true":
         logger.info("🪶 Running lightweight pipeline (Render environment detected)...")
         from app.workers.lightweight_scheduler import run_lightweight_ingestion_with_timeout
-        result = run_lightweight_ingestion_with_timeout(timeout_seconds=25)
+        result = run_lightweight_ingestion_with_timeout(timeout_seconds=60)
         logger.info(f"✅ Lightweight pipeline completed: {result}")
         return
     

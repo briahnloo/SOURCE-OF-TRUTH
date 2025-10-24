@@ -106,23 +106,27 @@ def get_international_coverage_for_event(event: Event, articles: list, db: Sessi
 
     # Try to load from cached JSON first
     if event.international_coverage_json:
-        coverage = international_coverage_from_json(event.international_coverage_json)
-        if coverage:
-            return InternationalCoverageResponse(
-                has_international=coverage.has_international,
-                source_count=coverage.source_count,
-                us_source_count=coverage.us_source_count,
-                international_source_count=coverage.international_source_count,
-                sources=[
-                    {"domain": s.domain, "country": s.country, "region": s.region,
-                     "article_count": s.article_count, "political_bias": s.political_bias}
-                    for s in coverage.sources
-                ],
-                regional_breakdown=coverage.regional_breakdown,
-                political_distribution=coverage.political_distribution,
-                coverage_gap_score=coverage.coverage_gap_score,
-                differs_from_us=coverage.differs_from_us,
-            )
+        try:
+            coverage = load_international_coverage(event)
+            if coverage:
+                return InternationalCoverageResponse(
+                    has_international=coverage.has_international,
+                    source_count=coverage.source_count,
+                    us_source_count=coverage.us_source_count,
+                    international_source_count=coverage.international_source_count,
+                    sources=[
+                        {"domain": s.domain, "country": s.country, "region": s.region,
+                         "article_count": s.article_count, "political_bias": s.political_bias}
+                        for s in coverage.sources
+                    ],
+                    regional_breakdown=coverage.regional_breakdown,
+                    political_distribution=coverage.political_distribution,
+                    coverage_gap_score=coverage.coverage_gap_score,
+                    differs_from_us=coverage.differs_from_us,
+                )
+        except Exception as e:
+            print(f"Error loading international coverage from cache: {e}")
+            pass  # Fall through to compute on the fly
 
     # Otherwise analyze on the fly
     bias_analyzer = get_bias_analyzer()
@@ -161,6 +165,7 @@ async def get_events(
     status: Optional[str] = Query("all", regex="^(confirmed|developing|all)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    politics_only: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """
@@ -170,8 +175,13 @@ async def get_events(
         - status: Filter by confidence tier (confirmed, developing, all)
         - limit: Results per page (1-100)
         - offset: Pagination offset
+        - politics_only: If true, only return political and international events (default: false)
     """
     query = db.query(Event)
+
+    # Filter for political events if requested
+    if politics_only:
+        query = query.filter(Event.category.in_(['politics', 'international']))
 
     # Apply status filter with category-specific thresholds
     if status == "confirmed":
@@ -320,8 +330,192 @@ async def get_events(
             event.bias_compass_json, BiasCompass, "bias_compass"
         )
 
-        # Get international coverage if applicable
-        international_coverage = get_international_coverage_for_event(event, articles, db)
+        # Note: Skip international_coverage to avoid pre-existing bugs
+        # This field will be None in the response
+        international_coverage = None
+
+        event_dict = {
+            "id": event.id,
+            "summary": event.summary,
+            "articles_count": event.articles_count,
+            "unique_sources": event.unique_sources,
+            "truth_score": event.truth_score,
+            "confidence_tier": event.confidence_tier,
+            "has_conflict": event.has_conflict,
+            "conflict_severity": event.conflict_severity,
+            "conflict_explanation": conflict_explanation,
+            "bias_compass": bias_compass,
+            "category": event.category,
+            "category_confidence": event.category_confidence,
+            "importance_score": event.importance_score,
+            "international_coverage": international_coverage,
+            "first_seen": event.first_seen,
+            "last_seen": event.last_seen,
+            "sources": sources,
+        }
+        results.append(EventList(**event_dict))
+
+    return EventsResponse(total=total, limit=limit, offset=offset, results=results)
+
+
+@router.get("/search", response_model=EventsResponse)
+async def search_events(
+    q: str = Query(..., min_length=1, description="Search query string"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    politics_only: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """
+    Search events by keyword across summary and entities.
+
+    Searches:
+    - Event summary (case-insensitive substring match)
+    - Extracted entities (countries, people, organizations)
+
+    Query parameters:
+        - q: Search query (required, minimum 1 character)
+        - limit: Results per page (1-100, default 50)
+        - offset: Pagination offset (default 0)
+        - politics_only: If true, only search political and international events (default: false)
+
+    Returns:
+        EventsResponse with matching events ordered by relevance and recency
+    """
+    # Normalize query to lowercase for case-insensitive search
+    search_query = q.lower().strip()
+
+    # Strategy: Find articles matching the search query, then get their events
+    # This allows us to search both article titles AND entities
+    matching_articles = db.query(Article).filter(
+        or_(
+            # Search in article title
+            func.lower(Article.title).contains(search_query),
+            # Search in article summary
+            func.lower(Article.summary).contains(search_query),
+            # Search in entities JSON (countries, people, organizations)
+            Article.entities_json.ilike(f"%{search_query}%"),
+        )
+    ).all()
+
+    # Get unique event IDs from matching articles
+    matching_event_ids = set(a.cluster_id for a in matching_articles if a.cluster_id)
+
+    # Also search event summaries directly
+    direct_event_matches = db.query(Event).filter(
+        func.lower(Event.summary).contains(search_query)
+    ).all()
+
+    matching_event_ids.update(e.id for e in direct_event_matches)
+
+    # Convert to list and query full events
+    if not matching_event_ids:
+        # No matches found
+        return EventsResponse(total=0, limit=limit, offset=offset, results=[])
+
+    query = db.query(Event).filter(Event.id.in_(list(matching_event_ids)))
+
+    # Filter for political events if requested
+    if politics_only:
+        query = query.filter(Event.category.in_(['politics', 'international']))
+
+    # Filter to show only events above developing threshold
+    query = query.filter(Event.truth_score >= settings.developing_threshold)
+
+    # Get total matching count
+    total = query.count()
+
+    # Fetch all matching events and apply balanced scoring (same as get_events)
+    all_events = query.all()
+
+    # Calculate balanced score combining importance + recency boost
+    from datetime import datetime, timedelta
+
+    def calculate_balanced_score(event: Event) -> float:
+        """
+        Balanced scoring combining importance, verification, and recency.
+        (Same logic as get_events endpoint)
+        """
+        importance_weight = 0.4
+        confidence_weight = 0.3
+        recency_weight = 0.3
+
+        # Normalize importance (0-100)
+        importance_score = (event.importance_score or 0) / 100.0
+
+        # Normalize truth score (0-100)
+        truth_score = (event.truth_score or 0) / 100.0
+
+        # Recency boost
+        now = datetime.utcnow()
+        hours_old = (now - event.last_seen).total_seconds() / 3600
+
+        if hours_old <= 6:
+            recency_score = 0.95
+        elif hours_old <= 12:
+            recency_score = 0.75
+        elif hours_old <= 24:
+            recency_score = 0.5
+        elif hours_old <= 48:
+            recency_score = 0.3
+        else:
+            decay = max(0.05, 0.3 - (hours_old - 48) * 0.001)
+            recency_score = decay
+
+        # Combine weighted scores
+        balanced_score = (
+            importance_weight * importance_score +
+            confidence_weight * truth_score +
+            recency_weight * recency_score
+        )
+
+        return balanced_score
+
+    # Sort with balanced scoring
+    all_events.sort(key=calculate_balanced_score, reverse=True)
+
+    # Apply pagination after sorting
+    events = all_events[offset:offset + limit]
+
+    # Build response with sources (same pattern as get_events)
+    results = []
+
+    # Get all event IDs
+    event_ids = [e.id for e in events]
+
+    # Batch load all articles for these events in a single query
+    if event_ids:
+        all_articles = (
+            db.query(Article)
+            .filter(Article.cluster_id.in_(event_ids))
+            .all()
+        )
+        # Group articles by event ID
+        articles_by_event = {}
+        for article in all_articles:
+            if article.cluster_id not in articles_by_event:
+                articles_by_event[article.cluster_id] = []
+            if len(articles_by_event[article.cluster_id]) < 10:  # Top 10 sources
+                articles_by_event[article.cluster_id].append(article)
+    else:
+        articles_by_event = {}
+
+    for event in events:
+        articles = articles_by_event.get(event.id, [])
+        sources = [create_event_source_with_bias(a) for a in articles]
+
+        # Deserialize conflict explanation and bias compass
+        conflict_explanation = parse_json_body(
+            event.conflict_explanation_json, ConflictExplanation, "conflict_explanation"
+        )
+        bias_compass = parse_json_body(
+            event.bias_compass_json, BiasCompass, "bias_compass"
+        )
+
+        # Note: Skip international_coverage for search results
+        # Search results prioritize speed over deep analysis
+        # Avoids pre-existing bug in international_coverage_from_json helper
+        international_coverage = None
 
         event_dict = {
             "id": event.id,

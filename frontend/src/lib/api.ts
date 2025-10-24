@@ -17,9 +17,14 @@ function getApiUrl(): string {
 // Check if backend is available
 async function isBackendAvailable(): Promise<boolean> {
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
         const response = await fetch(`${getApiUrl()}/health`, {
-            timeout: 5000,
+            signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
         return response.ok;
     } catch {
         return false;
@@ -251,22 +256,28 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
     if (typeof window === 'undefined') {
         const isAvailable = await isBackendAvailable();
         if (!isAvailable) {
-            throw new Error(`Backend is not available. Please ensure the backend service is running and accessible at ${getApiUrl()}.`);
+            const errorMsg = `Backend is not available. Please ensure the backend service is running and accessible at ${getApiUrl()}.`;
+            console.error('[API] Health check failed:', errorMsg);
+            throw new Error(errorMsg);
         }
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
         const response = await fetch(url, {
             cache: 'no-store',  // Disable Next.js caching for dynamic data
-            timeout: 10000,  // 10 second timeout
+            signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new APIError(
-                errorData.detail || `HTTP ${response.status}: ${response.statusText}`,
-                response.status
-            );
+            const errorMsg = errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+            console.error('[API] Response error:', { status: response.status, url, error: errorMsg });
+            throw new APIError(errorMsg, response.status);
         }
 
         return await response.json();
@@ -274,9 +285,16 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
         if (error instanceof APIError) {
             throw error;
         }
+
+        // Log the raw error for debugging
+        console.error('[API] Fetch error:', { endpoint, error, message: error instanceof Error ? error.message : String(error) });
+
         // More specific error handling
         if (error instanceof TypeError && error.message.includes('fetch failed')) {
             throw new Error(`Network error: Unable to connect to API at ${url}. Please ensure the backend is running.`);
+        }
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error(`Request timeout: API at ${url} took too long to respond.`);
         }
         throw new Error(`Failed to fetch from API: ${error}`);
     }
@@ -290,11 +308,13 @@ export const api = {
         status?: 'confirmed' | 'developing' | 'all';
         limit?: number;
         offset?: number;
+        politics_only?: boolean;
     }): Promise<EventsResponse> {
         const queryParams = new URLSearchParams();
         if (params?.status) queryParams.set('status', params.status);
         if (params?.limit) queryParams.set('limit', params.limit.toString());
         if (params?.offset) queryParams.set('offset', params.offset.toString());
+        if (params?.politics_only) queryParams.set('politics_only', 'true');
 
         const query = queryParams.toString();
         return fetchAPI<EventsResponse>(`/events${query ? `?${query}` : ''}`);
@@ -317,6 +337,26 @@ export const api = {
 
         const query = queryParams.toString();
         return fetchAPI<EventsResponse>(`/events/conflicts${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Search events by keyword
+     * Searches event summaries and extracted entities
+     */
+    async searchEvents(params: {
+        q: string;
+        limit?: number;
+        offset?: number;
+        politics_only?: boolean;
+    }): Promise<EventsResponse> {
+        const queryParams = new URLSearchParams();
+        queryParams.set('q', params.q);
+        if (params?.limit) queryParams.set('limit', params.limit.toString());
+        if (params?.offset) queryParams.set('offset', params.offset.toString());
+        if (params?.politics_only) queryParams.set('politics_only', 'true');
+
+        const query = queryParams.toString();
+        return fetchAPI<EventsResponse>(`/events/search${query ? `?${query}` : ''}`);
     },
 
     /**

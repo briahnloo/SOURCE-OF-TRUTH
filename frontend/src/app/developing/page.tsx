@@ -11,6 +11,7 @@ export default async function DevelopingPage() {
         const response = await api.getEvents({
             status: 'developing',
             limit: 50,
+            politics_only: true,
         });
         events = response.results;
     } catch (e) {

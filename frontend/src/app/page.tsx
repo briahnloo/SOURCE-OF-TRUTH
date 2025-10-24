@@ -13,6 +13,7 @@ export default async function HomePage() {
         const response = await api.getEvents({
             status: 'confirmed',
             limit: 20,
+            politics_only: true,
         });
         events = response.results;
     } catch (e) {

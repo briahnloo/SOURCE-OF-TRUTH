@@ -1,0 +1,417 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        TRUTHBOARD DEPLOYMENT ARCHITECTURE                     ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+COMPLETE SYSTEM DIAGRAM
+═══════════════════════════════════════════════════════════════════════════════
+
+                              INTERNET / USERS
+                                     |
+                    ┌────────────────┼────────────────┐
+                    |                |                |
+        ┌──────────────────┐  ┌──────────────────┐   |
+        │                  │  │                  │   │
+        │    VERCEL CDN    │  │  Vercel Compute  │   |
+        │  (Static Assets) │  │  (Next.js Apps)  │   |
+        │                  │  │                  │   |
+        └──────────────────┘  └──────────────────┘   |
+                    |                |                 |
+                    └────────────────┤─────────────────┤─── HTTPS
+                                     |                 |
+                            https://truthboard.vercel.app
+                                     |
+                                     | API Calls
+                                     |
+                   ┌─────────────────▼──────────────────┐
+                   │                                    │
+                   │      RENDER EDGE NETWORK           │
+                   │   (Geolocation + Caching)          │
+                   │                                    │
+                   └─────────────────┬──────────────────┘
+                                     |
+                                     | Routed to
+                                     |
+                   ┌─────────────────▼──────────────────┐
+                   │                                    │
+                   │     RENDER WEB SERVICE             │
+                   │    (FastAPI Backend)               │
+                   │     Port: 8000                     │
+                   │     Python 3.11                    │
+                   │     Docker Container              │
+                   │                                    │
+                   │  ┌──────────────────────────────┐  │
+                   │  │  FastAPI App                 │  │
+                   │  │  ├─ /events                  │  │
+                   │  │  ├─ /events/search           │  │
+                   │  │  ├─ /events/conflicts        │  │
+                   │  │  ├─ /health                  │  │
+                   │  │  └─ /docs (Swagger UI)       │  │
+                   │  └──────────────────────────────┘  │
+                   │                                    │
+                   └─────────────────┬──────────────────┘
+                                     |
+                                     | Connects to
+                                     |
+                   ┌─────────────────▼──────────────────┐
+                   │                                    │
+                   │  RENDER PostgreSQL DATABASE        │
+                   │     (Managed Service)              │
+                   │     Port: 5432                     │
+                   │     Storage: 1 GB (Free)           │
+                   │     Backups: Daily + Automatic     │
+                   │                                    │
+                   │  ┌──────────────────────────────┐  │
+                   │  │  Tables:                     │  │
+                   │  │  ├─ events                   │  │
+                   │  │  ├─ articles                 │  │
+                   │  │  ├─ sources                  │  │
+                   │  │  └─ embeddings (cached)      │  │
+                   │  └──────────────────────────────┘  │
+                   │                                    │
+                   └────────────────────────────────────┘
+
+
+DEPLOYMENT MAPPING
+═══════════════════════════════════════════════════════════════════════════════
+
+Your Repository          →  Deployment
+────────────────────         ──────────
+/frontend                →  Vercel
+├─ src/
+├─ public/
+├─ package.json          →  Build: npm install && npm run build
+├─ next.config.js
+└─ .env.production       →  NEXT_PUBLIC_API_URL=https://truthboard-api.onrender.com
+
+/backend                 →  Render
+├─ app/
+├─ pyproject.toml        →  Build: pip install -e .
+├─ requirements.txt      →  Dependencies
+├─ Dockerfile            →  FROM python:3.11-slim
+└─ data/                 →  Persisted volume for SQLite
+
+
+DATA FLOW
+═════════════════════════════════════════════════════════════════════════════
+
+USER ACCESSES SITE
+       |
+       ▼
+VERCEL CDN (https://truthboard.vercel.app)
+       |
+       ├─ Serves static HTML/CSS/JS
+       │  (from Vercel's global edge network)
+       │
+       ▼
+BROWSER LOADS NEXT.JS APP
+       |
+       ├─ Server-side renders components
+       │  (on Vercel compute)
+       │
+       ▼
+BROWSER REQUESTS DATA
+       |
+       ├─ Makes HTTPS fetch to API
+       │  (https://truthboard-api.onrender.com/events)
+       │
+       ▼
+RENDER API RECEIVES REQUEST
+       |
+       ├─ FastAPI routes to handler
+       │  (api.getEvents)
+       │
+       ▼
+API QUERIES DATABASE
+       |
+       ├─ PostgreSQL connection
+       │  (from DATABASE_URL)
+       │
+       ▼
+DATABASE RETURNS DATA
+       |
+       ├─ JSON serialized
+       │
+       ▼
+API RETURNS RESPONSE (200 OK)
+       |
+       ├─ HTTPS response to frontend
+       │
+       ▼
+FRONTEND RENDERS DATA
+       |
+       ├─ Updates React state
+       │ Shows events on page
+       │
+       ▼
+USER SEES RESULTS
+
+
+ENVIRONMENT VARIABLES PROPAGATION
+═════════════════════════════════════════════════════════════════════════════
+
+Frontend (.env.production) [Vercel]
+├─ NEXT_PUBLIC_API_URL=https://truthboard-api.onrender.com
+│  └─ Injected into browser
+│     └─ Used by fetch() calls
+│
+└─ INTERNAL_API_URL=https://truthboard-api.onrender.com
+   └─ Used during SSR (server-side rendering)
+      └─ When frontend fetches during page generation
+
+
+Backend (Render Environment Variables)
+├─ DATABASE_URL=postgresql://user:pass@host:5432/truthboard
+│  └─ Used by SQLAlchemy
+│     └─ Connection pool to PostgreSQL
+│
+├─ ALLOWED_ORIGINS=https://truthboard.vercel.app
+│  └─ CORS middleware
+│     └─ Allows Vercel domain to make API calls
+│
+├─ ENABLE_SCHEDULER=false
+│  └─ Disables background jobs
+│     └─ Background scheduler only on paid tier
+│
+└─ PYTHONUNBUFFERED=1
+   └─ Real-time logging to Render console
+
+
+NETWORK FLOW DIAGRAM
+═════════════════════════════════════════════════════════════════════════════
+
+                  EXTERNAL INTERNET (Public)
+                           |
+        ┌──────────────────┬┴───────────────┐
+        |                  |                |
+        ▼                  ▼                ▼
+    Vercel             Render             PostgreSQL
+  (Frontend)           (Backend)          (Database)
+  54.200.x.x        203.0.113.x         198.51.100.x
+        |                  |                |
+        │                  │                │
+        │ Users            │ API calls      │ DB queries
+        │ access           │ to backend     │ from backend
+        │ site             │               │
+        │                  │                │
+        └────────────────▶ REST API◀───────┘
+
+        HTTPS             HTTPS            TCP
+        Port 443          Port 443          Port 5432
+
+        (Encrypted)       (Encrypted)       (Private)
+
+
+PORT USAGE
+═══════════════════════════════════════════════════════════════════════════════
+
+Local Development
+─────────────────
+Frontend:  localhost:3001    (next dev)
+Backend:   localhost:8000    (uvicorn)
+Database:  localhost:5432    (PostgreSQL)
+
+
+Production (Deployed)
+─────────────────────
+Vercel:
+  ├─ Incoming: HTTPS 443
+  │  └─ Auto-scaled globally
+  │
+  └─ Outgoing to Render: HTTPS 443
+     └─ Backend domain (DNS resolved)
+
+Render Backend:
+  ├─ Incoming: HTTPS 443
+  │  └─ Requests from Vercel frontend
+  │
+  └─ Outgoing: TCP 5432
+     └─ PostgreSQL database connection
+
+PostgreSQL:
+  ├─ Incoming: TCP 5432
+  │  └─ Only from Render backend
+  │
+  └─ No outgoing
+
+
+DEPLOYMENT TIMELINE
+═══════════════════════════════════════════════════════════════════════════════
+
+Time    Event
+────    ─────
+0 min   User creates Render account
+2 min   PostgreSQL database created (status: green)
+5 min   Backend deployment starts (Render builds Docker)
+12 min  Backend deployment complete (URL available)
+15 min  Frontend config updated
+17 min  Frontend deployment starts (Vercel builds Next.js)
+22 min  Frontend deployment complete (URL available)
+24 min  Backend ALLOWED_ORIGINS updated
+25 min  Backend redeploy complete
+26 min  READY FOR PRODUCTION
+
+
+SCALING SCENARIOS
+═══════════════════════════════════════════════════════════════════════════════
+
+Scenario 1: Free Tier (Current)
+───────────────────────────────
+✓ Vercel Free:     ~100 builds/month, unlimited bandwidth
+✓ Render Free:     Sleeps after 15 min inactivity
+✓ PostgreSQL Free: 1 GB storage, limited connections
+
+Cost: $0/month
+Performance: Adequate for <100 concurrent users
+Maintenance: Keep-alive cron required
+
+
+Scenario 2: Small Upgrade ($10/month)
+──────────────────────────────────────
+✓ Render Web Service: $7/month (no sleep, better resources)
+✓ PostgreSQL Free: 1 GB storage
+✓ Vercel Free: (no change)
+
+Cost: $7/month
+Performance: No service sleeping, faster responses
+Maintenance: No keep-alive needed
+
+
+Scenario 3: Medium Upgrade ($40/month)
+───────────────────────────────────────
+✓ Render Web Service: $7/month
+✓ PostgreSQL: $15/month (10 GB storage)
+✓ Vercel Pro: $20/month (analytics, edge functions)
+
+Cost: $42/month
+Performance: Production-grade
+Maintenance: Database monitoring required
+
+
+Scenario 4: Full Production ($50-100+/month)
+──────────────────────────────────────────────
+✓ Render Web Service: $25/month (high performance)
+✓ PostgreSQL: $50/month (50 GB storage)
+✓ Vercel Pro: $20/month
+✓ Monitoring services, backups, etc.
+
+Cost: $95+/month
+Performance: Enterprise-grade
+Maintenance: Dedicated DevOps
+
+
+ARCHITECTURE DECISIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+Why Render for Backend?
+───────────────────────
+✓ Native Docker support (your Dockerfile works as-is)
+✓ PostgreSQL managed service included
+✓ Simple GitHub integration
+✓ Free tier adequate for MVP
+✓ Easy to upgrade
+✗ Not AWS/GCP (harder to set up for beginners)
+
+
+Why Vercel for Frontend?
+────────────────────────
+✓ Next.js native (optimal performance)
+✓ Global CDN (fast everywhere)
+✓ Auto-scaling
+✓ Zero-config HTTPS
+✓ Easiest to use
+✗ Limited backend capabilities
+
+
+Why PostgreSQL not SQLite?
+──────────────────────────
+✓ SQLite works locally but doesn't scale
+✓ PostgreSQL handles concurrent requests better
+✓ Managed service = automatic backups
+✓ Connection pooling available
+✗ Slightly more complex
+
+
+MONITORING & OBSERVABILITY
+═══════════════════════════════════════════════════════════════════════════════
+
+Vercel
+──────
+Dashboards:
+  ├─ https://vercel.com/dashboard
+  │  ├─ Deployment history
+  │  ├─ Build logs
+  │  ├─ Performance metrics
+  │  └─ Error tracking
+  │
+  └─ Built-in analytics (Vercel Web Analytics)
+
+Alerts:
+  ├─ Email on failed builds
+  ├─ GitHub integration shows status
+  └─ Custom webhooks
+
+
+Render
+──────
+Dashboards:
+  ├─ https://dashboard.render.com
+  │  ├─ Service logs (real-time)
+  │  ├─ CPU/Memory usage
+  │  ├─ Deployment history
+  │  └─ PostgreSQL metrics
+  │
+  └─ Health checks visible
+
+
+External Monitoring
+───────────────────
+UptimeRobot (Free):
+  ├─ Monitors: https://truthboard-api.onrender.com/health
+  ├─ Frequency: 30 minutes
+  ├─ Alerts: Email when down
+  └─ Keeps backend awake (prevents sleep)
+
+
+BACKUP & RECOVERY
+═════════════════════════════════════════════════════════════════════════════════
+
+Automatic Backups
+──────────────────
+PostgreSQL on Render:
+  ├─ Daily automated backups
+  ├─ 2 week retention
+  ├─ Accessible from dashboard
+  └─ Click "Restore" to roll back
+
+
+Manual Backups
+───────────────
+From terminal:
+  └─ pg_dump command (see DEPLOYMENT_COMMANDS.md)
+
+GitHub as Backup:
+  ├─ All code committed to GitHub
+  ├─ Can redeploy anytime
+  ├─ Full version history
+  └─ Easy rollback via git revert
+
+
+Recovery Process
+──────────────────
+Database Corruption:
+  1. Render dashboard → PostgreSQL instance
+  2. Click "Restore backup"
+  3. Choose date before corruption
+  4. Wait 5-10 minutes
+
+Code Issues:
+  1. git revert <bad-commit>
+  2. git push to main
+  3. Vercel/Render auto-redeploy
+  4. Done!
+
+
+═════════════════════════════════════════════════════════════════════════════════
+                                END OF ARCHITECTURE
+═════════════════════════════════════════════════════════════════════════════════

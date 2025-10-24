@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
 import NavLink from '@/components/NavLink';
+import { SearchBar } from '@/components/SearchBar';
 
 export const metadata: Metadata = {
     title: 'The Truthboard - Truth Layer for the Internet',
@@ -49,6 +50,11 @@ export default function RootLayout({
                                     <NavLink href="/flagged">Flagged</NavLink>
                                     <NavLink href="/stats">Stats</NavLink>
                                 </nav>
+
+                                {/* Search Bar */}
+                                <div className="hidden md:block">
+                                    <SearchBar />
+                                </div>
 
                                 {/* Mobile menu button */}
                                 <button className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">

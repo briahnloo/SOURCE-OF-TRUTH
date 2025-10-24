@@ -11,12 +11,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# Optional scheduler import (only if enabled)
+# Scheduler imports (always import, but conditionally start)
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from app.workers.scheduler import run_ingestion_pipeline
+
 scheduler = None
-if os.getenv("ENABLE_SCHEDULER", "").lower() == "true":
-    from apscheduler.schedulers.background import BackgroundScheduler
-    from apscheduler.triggers.interval import IntervalTrigger
-    from app.workers.scheduler import run_ingestion_pipeline
 
 
 @asynccontextmanager
@@ -42,8 +42,13 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize database: {e}")
         sys.exit(1)
 
-    # Start background scheduler if enabled
-    if os.getenv("ENABLE_SCHEDULER", "").lower() == "true":
+    # Start background scheduler if enabled (default: true on non-free tier)
+    # Check environment variable (ENABLE_SCHEDULER) or run if Standard tier
+    enable_scheduler = os.getenv("ENABLE_SCHEDULER", "").lower() == "true"
+    is_standard_tier = os.getenv("RENDER_INSTANCE_TYPE", "").lower() != "free"
+
+    # If on Standard tier or explicitly enabled, start scheduler
+    if enable_scheduler or is_standard_tier:
         print("🔄 Starting background scheduler...")
         scheduler = BackgroundScheduler()
         scheduler.add_job(
@@ -55,13 +60,15 @@ async def lifespan(app: FastAPI):
         )
         scheduler.start()
         print("✅ Background scheduler started (15-minute interval)")
-        
+
         # Run once immediately in background
         scheduler.add_job(
             run_ingestion_pipeline,
             id="initial_run",
             name="Initial Pipeline Run",
         )
+    else:
+        print("⏭️ Scheduler disabled (free tier detected)")
 
     yield
 

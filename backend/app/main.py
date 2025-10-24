@@ -51,11 +51,11 @@ async def lifespan(app: FastAPI):
     if enable_scheduler or is_standard_tier:
         print("🔄 Starting background scheduler...")
         try:
-            from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
+            from apscheduler.executors.pool import ThreadPoolExecutor
 
             scheduler = BackgroundScheduler(
                 executors={
-                    'default': ThreadPoolExecutor(max_workers=2),
+                    'default': ThreadPoolExecutor(max_workers=1),
                 },
                 job_defaults={
                     'coalesce': True,
@@ -80,6 +80,8 @@ async def lifespan(app: FastAPI):
             )
         except Exception as e:
             print(f"⚠️ Failed to start scheduler: {e}")
+            # If scheduler fails to start, continue without it
+            pass
     else:
         print("⏭️ Scheduler disabled (free tier detected)")
 

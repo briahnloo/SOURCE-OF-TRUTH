@@ -59,7 +59,7 @@ def run_lightweight_ingestion() -> Dict:
         
         # RSS feeds (lightweight)
         try:
-            rss_articles = fetch_rss_articles(minutes=60)  # Last hour only
+            rss_articles = fetch_rss_articles()
             all_articles.extend(rss_articles)
             logger.info(f"✅ RSS: {len(rss_articles)} articles")
         except Exception as e:
@@ -69,7 +69,7 @@ def run_lightweight_ingestion() -> Dict:
         # NewsAPI (if key available)
         if settings.newsapi_key:
             try:
-                newsapi_articles = fetch_newsapi_articles(minutes=60)
+                newsapi_articles = fetch_newsapi_articles()
                 all_articles.extend(newsapi_articles)
                 logger.info(f"✅ NewsAPI: {len(newsapi_articles)} articles")
             except Exception as e:
@@ -78,7 +78,7 @@ def run_lightweight_ingestion() -> Dict:
 
         # GDELT (no API key needed, breaking news)
         try:
-            gdelt_articles = fetch_gdelt_articles(minutes=60)
+            gdelt_articles = fetch_gdelt_articles()
             all_articles.extend(gdelt_articles)
             logger.info(f"✅ GDELT: {len(gdelt_articles)} articles")
         except Exception as e:
@@ -161,30 +161,57 @@ def run_lightweight_ingestion() -> Dict:
 
 def run_lightweight_ingestion_with_timeout(timeout_seconds: int = 25) -> Dict:
     """
-    Run lightweight ingestion with timeout for Render free tier.
+    Run lightweight ingestion with timeout protection.
+
+    Note: signal.SIGALRM doesn't work in background threads (APScheduler),
+    so we use threading.Timer as a fallback for monitoring.
     """
-    import signal
-    
-    def timeout_handler(signum, frame):
-        raise TimeoutError("Ingestion timeout")
-    
-    # Set timeout
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(timeout_seconds)
-    
-    try:
-        result = run_lightweight_ingestion()
-        signal.alarm(0)  # Cancel timeout
-        return result
-    except TimeoutError:
-        logger.error(f"⏰ Ingestion timed out after {timeout_seconds}s")
+    import threading
+
+    result_container = {}
+    exception_container = {}
+
+    def run_with_exception_handling():
+        try:
+            result_container['result'] = run_lightweight_ingestion()
+        except Exception as e:
+            exception_container['exception'] = e
+
+    # Run ingestion in a thread with timeout monitoring
+    thread = threading.Thread(target=run_with_exception_handling, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout_seconds)
+
+    # Check if thread is still running (timeout occurred)
+    if thread.is_alive():
+        logger.error(f"⏰ Ingestion timed out after {timeout_seconds}s (still running)")
         return {
             "articles_fetched": 0,
             "articles_stored": 0,
             "events_created": 0,
             "events_scored": 0,
-            "errors": ["Timeout"],
+            "errors": ["Timeout after 25 seconds"],
             "duration_seconds": timeout_seconds
         }
-    finally:
-        signal.alarm(0)  # Ensure timeout is cancelled
+
+    # Check for exceptions
+    if exception_container:
+        logger.error(f"❌ Ingestion failed with exception: {exception_container['exception']}")
+        return {
+            "articles_fetched": 0,
+            "articles_stored": 0,
+            "events_created": 0,
+            "events_scored": 0,
+            "errors": [str(exception_container['exception'])],
+            "duration_seconds": timeout_seconds
+        }
+
+    # Return successful result
+    return result_container.get('result', {
+        "articles_fetched": 0,
+        "articles_stored": 0,
+        "events_created": 0,
+        "events_scored": 0,
+        "errors": ["Unknown error"],
+        "duration_seconds": timeout_seconds
+    })

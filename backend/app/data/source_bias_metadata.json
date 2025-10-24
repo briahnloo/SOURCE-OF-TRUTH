@@ -1,0 +1,962 @@
+{
+    "feeds.apnews.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.1,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.7,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.1,
+            "factual": 0.9
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "reutersagency.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.1,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.15,
+            "center": 0.75,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.1,
+            "factual": 0.9
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "feeds.bbci.co.uk": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.6,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "aljazeera.com": {
+        "geographic": {
+            "western": 0.2,
+            "eastern": 0.6,
+            "global_south": 0.2
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.3,
+            "factual": 0.7
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "rss.dw.com": {
+        "geographic": {
+            "western": 0.75,
+            "eastern": 0.15,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.35,
+            "center": 0.55,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "france24.com": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.35,
+            "center": 0.55,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.25,
+            "factual": 0.75
+        },
+        "detail": {
+            "surface": 0.4,
+            "deep": 0.6
+        }
+    },
+    "theguardian.com": {
+        "geographic": {
+            "western": 0.75,
+            "eastern": 0.15,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.6,
+            "center": 0.35,
+            "right": 0.05
+        },
+        "tone": {
+            "sensational": 0.25,
+            "factual": 0.75
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "feeds.npr.org": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "rss.cnn.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.45,
+            "center": 0.45,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.5,
+            "factual": 0.5
+        },
+        "detail": {
+            "surface": 0.6,
+            "deep": 0.4
+        }
+    },
+    "rss.nytimes.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.15,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.55,
+            "center": 0.4,
+            "right": 0.05
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "economist.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.15,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.25,
+            "center": 0.65,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "independent.co.uk": {
+        "geographic": {
+            "western": 0.75,
+            "eastern": 0.15,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.5,
+            "center": 0.45,
+            "right": 0.05
+        },
+        "tone": {
+            "sensational": 0.35,
+            "factual": 0.65
+        },
+        "detail": {
+            "surface": 0.4,
+            "deep": 0.6
+        }
+    },
+    "washingtonpost.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.5,
+            "center": 0.45,
+            "right": 0.05
+        },
+        "tone": {
+            "sensational": 0.25,
+            "factual": 0.75
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "wsj.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.15,
+            "center": 0.5,
+            "right": 0.35
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "foxnews.com": {
+        "geographic": {
+            "western": 0.9,
+            "eastern": 0.05,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.05,
+            "center": 0.25,
+            "right": 0.7
+        },
+        "tone": {
+            "sensational": 0.65,
+            "factual": 0.35
+        },
+        "detail": {
+            "surface": 0.7,
+            "deep": 0.3
+        }
+    },
+    "rt.com": {
+        "geographic": {
+            "western": 0.2,
+            "eastern": 0.7,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.25,
+            "center": 0.4,
+            "right": 0.35
+        },
+        "tone": {
+            "sensational": 0.45,
+            "factual": 0.55
+        },
+        "detail": {
+            "surface": 0.5,
+            "deep": 0.5
+        }
+    },
+    "timesofindia.indiatimes.com": {
+        "geographic": {
+            "western": 0.15,
+            "eastern": 0.2,
+            "global_south": 0.65
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.5,
+            "right": 0.2
+        },
+        "tone": {
+            "sensational": 0.4,
+            "factual": 0.6
+        },
+        "detail": {
+            "surface": 0.5,
+            "deep": 0.5
+        }
+    },
+    "reddit.com": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.45,
+            "center": 0.4,
+            "right": 0.15
+        },
+        "tone": {
+            "sensational": 0.6,
+            "factual": 0.4
+        },
+        "detail": {
+            "surface": 0.7,
+            "deep": 0.3
+        }
+    },
+    "apnews.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.1,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.7,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.1,
+            "factual": 0.9
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "reuters.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.1,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.15,
+            "center": 0.75,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.1,
+            "factual": 0.9
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "bbc.co.uk": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.6,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "dw.com": {
+        "geographic": {
+            "western": 0.75,
+            "eastern": 0.15,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.35,
+            "center": 0.55,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "npr.org": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "cnn.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.45,
+            "center": 0.45,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.5,
+            "factual": 0.5
+        },
+        "detail": {
+            "surface": 0.6,
+            "deep": 0.4
+        }
+    },
+    "nytimes.com": {
+        "geographic": {
+            "western": 0.8,
+            "eastern": 0.15,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.55,
+            "center": 0.4,
+            "right": 0.05
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "moxie.foxnews.com": {
+        "geographic": {
+            "western": 0.9,
+            "eastern": 0.05,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.05,
+            "center": 0.25,
+            "right": 0.7
+        },
+        "tone": {
+            "sensational": 0.65,
+            "factual": 0.35
+        },
+        "detail": {
+            "surface": 0.7,
+            "deep": 0.3
+        }
+    },
+    "wsj.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.15,
+            "center": 0.5,
+            "right": 0.35
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "dailywire.com": {
+        "geographic": {
+            "western": 0.9,
+            "eastern": 0.05,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.05,
+            "center": 0.2,
+            "right": 0.75
+        },
+        "tone": {
+            "sensational": 0.5,
+            "factual": 0.5
+        },
+        "detail": {
+            "surface": 0.6,
+            "deep": 0.4
+        }
+    },
+    "nationalreview.com": {
+        "geographic": {
+            "western": 0.88,
+            "eastern": 0.08,
+            "global_south": 0.04
+        },
+        "political": {
+            "left": 0.05,
+            "center": 0.25,
+            "right": 0.7
+        },
+        "tone": {
+            "sensational": 0.4,
+            "factual": 0.6
+        },
+        "detail": {
+            "surface": 0.4,
+            "deep": 0.6
+        }
+    },
+    "breitbart.com": {
+        "geographic": {
+            "western": 0.92,
+            "eastern": 0.05,
+            "global_south": 0.03
+        },
+        "political": {
+            "left": 0.03,
+            "center": 0.15,
+            "right": 0.82
+        },
+        "tone": {
+            "sensational": 0.75,
+            "factual": 0.25
+        },
+        "detail": {
+            "surface": 0.8,
+            "deep": 0.2
+        }
+    },
+    "nypost.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.15,
+            "center": 0.4,
+            "right": 0.45
+        },
+        "tone": {
+            "sensational": 0.7,
+            "factual": 0.3
+        },
+        "detail": {
+            "surface": 0.75,
+            "deep": 0.25
+        }
+    },
+    "washingtonexaminer.com": {
+        "geographic": {
+            "western": 0.88,
+            "eastern": 0.08,
+            "global_south": 0.04
+        },
+        "political": {
+            "left": 0.08,
+            "center": 0.27,
+            "right": 0.65
+        },
+        "tone": {
+            "sensational": 0.45,
+            "factual": 0.55
+        },
+        "detail": {
+            "surface": 0.55,
+            "deep": 0.45
+        }
+    },
+    "thehill.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.5,
+            "right": 0.2
+        },
+        "tone": {
+            "sensational": 0.35,
+            "factual": 0.65
+        },
+        "detail": {
+            "surface": 0.5,
+            "deep": 0.5
+        }
+    },
+    "www3.nhk.or.jp": {
+        "geographic": {
+            "western": 0.2,
+            "eastern": 0.7,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.7,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.1,
+            "factual": 0.9
+        },
+        "detail": {
+            "surface": 0.2,
+            "deep": 0.8
+        }
+    },
+    "abc.net.au": {
+        "geographic": {
+            "western": 0.6,
+            "eastern": 0.3,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "cbc.ca": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "euronews.com": {
+        "geographic": {
+            "western": 0.6,
+            "eastern": 0.3,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.6,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "africanews.com": {
+        "geographic": {
+            "western": 0.3,
+            "eastern": 0.2,
+            "global_south": 0.5
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.6,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.25,
+            "factual": 0.75
+        },
+        "detail": {
+            "surface": 0.4,
+            "deep": 0.6
+        }
+    },
+    "straitstimes.com": {
+        "geographic": {
+            "western": 0.4,
+            "eastern": 0.5,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.7,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "time.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.3,
+            "factual": 0.7
+        },
+        "detail": {
+            "surface": 0.35,
+            "deep": 0.65
+        }
+    },
+    "kyivindependent.com": {
+        "geographic": {
+            "western": 0.3,
+            "eastern": 0.6,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.5,
+            "right": 0.2
+        },
+        "tone": {
+            "sensational": 0.4,
+            "factual": 0.6
+        },
+        "detail": {
+            "surface": 0.5,
+            "deep": 0.5
+        }
+    },
+    "edition.cnn.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.45,
+            "center": 0.45,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.5,
+            "factual": 0.5
+        },
+        "detail": {
+            "surface": 0.6,
+            "deep": 0.4
+        }
+    },
+    "bbc.com": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.3,
+            "center": 0.6,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.2,
+            "factual": 0.8
+        },
+        "detail": {
+            "surface": 0.3,
+            "deep": 0.7
+        }
+    },
+    "cnbc.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.6,
+            "right": 0.2
+        },
+        "tone": {
+            "sensational": 0.35,
+            "factual": 0.65
+        },
+        "detail": {
+            "surface": 0.4,
+            "deep": 0.6
+        }
+    },
+    "feeds.bloomberg.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.65,
+            "right": 0.15
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "bloomberg.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.2,
+            "center": 0.65,
+            "right": 0.15
+        },
+        "tone": {
+            "sensational": 0.15,
+            "factual": 0.85
+        },
+        "detail": {
+            "surface": 0.25,
+            "deep": 0.75
+        }
+    },
+    "bnonews.com": {
+        "geographic": {
+            "western": 0.7,
+            "eastern": 0.2,
+            "global_south": 0.1
+        },
+        "political": {
+            "left": 0.35,
+            "center": 0.55,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.25,
+            "factual": 0.75
+        },
+        "detail": {
+            "surface": 0.35,
+            "deep": 0.65
+        }
+    },
+    "msn.com": {
+        "geographic": {
+            "western": 0.85,
+            "eastern": 0.1,
+            "global_south": 0.05
+        },
+        "political": {
+            "left": 0.4,
+            "center": 0.5,
+            "right": 0.1
+        },
+        "tone": {
+            "sensational": 0.4,
+            "factual": 0.6
+        },
+        "detail": {
+            "surface": 0.45,
+            "deep": 0.55
+        }
+    }
+}

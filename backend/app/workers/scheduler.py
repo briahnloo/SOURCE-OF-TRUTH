@@ -714,13 +714,16 @@ def run_ingestion_pipeline() -> None:
 
     Uses exponential backoff for transient failures and structured logging.
     """
-    # Check if we're on Render (use lightweight mode by default to prevent timeouts)
-    # Full pipeline can hang on limited resources
-    # Standard tier+ can run heavier loads with proper configuration
-    if os.getenv("RENDER", "").lower() == "true":
-        logger.info("🪶 Running lightweight pipeline (Render environment detected)...")
+    # Check if we should use lightweight mode
+    # Use lightweight by default for Render and localhost (to prevent clustering hangs)
+    # Only use full pipeline in production with sufficient resources
+    use_lightweight = os.getenv("RENDER", "").lower() == "true" or os.getenv("USE_LIGHTWEIGHT_PIPELINE", "false").lower() == "true"
+
+    if use_lightweight or not os.getenv("RENDER"):
+        # Default to lightweight on localhost/development
+        logger.info("🪶 Running lightweight pipeline (lightweight mode enabled)...")
         from app.workers.lightweight_scheduler import run_lightweight_ingestion_with_timeout
-        result = run_lightweight_ingestion_with_timeout(timeout_seconds=60)
+        result = run_lightweight_ingestion_with_timeout(timeout_seconds=120)
         logger.info(f"✅ Lightweight pipeline completed: {result}")
         return
     

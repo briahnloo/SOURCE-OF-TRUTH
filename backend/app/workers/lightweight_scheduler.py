@@ -120,27 +120,14 @@ def run_lightweight_ingestion() -> Dict:
             stats["errors"].append(f"Normalization: {str(e)}")
             return stats
         
-        # Step 3: Cluster articles (lightweight - only if we have articles)
-        if stored_count > 0:
-            logger.info("🔗 Step 3: Clustering articles...")
-            try:
-                events_created = cluster_articles(db)
-                stats["events_created"] = events_created
-                logger.info(f"✅ Created {events_created} events")
-            except Exception as e:
-                logger.error(f"❌ Clustering failed: {e}")
-                stats["errors"].append(f"Clustering: {str(e)}")
-        
-        # Step 4: Score events (lightweight)
-        if stats["events_created"] > 0:
-            logger.info("📊 Step 4: Scoring events...")
-            try:
-                events_scored = score_recent_events(db, hours=24)
-                stats["events_scored"] = events_scored
-                logger.info(f"✅ Scored {events_scored} events")
-            except Exception as e:
-                logger.error(f"❌ Scoring failed: {e}")
-                stats["errors"].append(f"Scoring: {str(e)}")
+        # Step 3: Skip clustering in lightweight mode (too heavy for Render free tier)
+        # Clustering is CPU-intensive and causes timeouts on limited resources
+        logger.info("⊘ Step 3: Skipping clustering in lightweight mode")
+        stats["events_created"] = 0
+
+        # Step 4: Skip scoring in lightweight mode
+        logger.info("⊘ Step 4: Skipping scoring in lightweight mode")
+        stats["events_scored"] = 0
         
         db.close()
         

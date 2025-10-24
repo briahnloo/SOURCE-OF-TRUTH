@@ -36,11 +36,11 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 export default function StatsPanel({ stats }: StatsPanelProps) {
-    const [timeAgo, setTimeAgo] = useState<string>('');
+    const [timeAgo, setTimeAgo] = useState<string>('Calculating...');
 
     useEffect(() => {
         const updateTimeAgo = () => {
-            if (!stats.last_ingestion) {
+            if (!stats || !stats.last_ingestion) {
                 setTimeAgo('No data');
                 return;
             }

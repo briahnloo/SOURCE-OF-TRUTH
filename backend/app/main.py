@@ -50,23 +50,36 @@ async def lifespan(app: FastAPI):
     # If on Standard tier or explicitly enabled, start scheduler
     if enable_scheduler or is_standard_tier:
         print("🔄 Starting background scheduler...")
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(
-            run_ingestion_pipeline,
-            trigger=IntervalTrigger(minutes=15),
-            id="ingestion_pipeline",
-            name="Ingestion Pipeline",
-            replace_existing=True,
-        )
-        scheduler.start()
-        print("✅ Background scheduler started (15-minute interval)")
+        try:
+            from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
 
-        # Run once immediately in background
-        scheduler.add_job(
-            run_ingestion_pipeline,
-            id="initial_run",
-            name="Initial Pipeline Run",
-        )
+            scheduler = BackgroundScheduler(
+                executors={
+                    'default': ThreadPoolExecutor(max_workers=2),
+                },
+                job_defaults={
+                    'coalesce': True,
+                    'max_instances': 1,
+                }
+            )
+            scheduler.add_job(
+                run_ingestion_pipeline,
+                trigger=IntervalTrigger(minutes=15),
+                id="ingestion_pipeline",
+                name="Ingestion Pipeline",
+                replace_existing=True,
+            )
+            scheduler.start()
+            print("✅ Background scheduler started (15-minute interval)")
+
+            # Run once immediately in background (don't wait for it)
+            scheduler.add_job(
+                run_ingestion_pipeline,
+                id="initial_run",
+                name="Initial Pipeline Run",
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to start scheduler: {e}")
     else:
         print("⏭️ Scheduler disabled (free tier detected)")
 

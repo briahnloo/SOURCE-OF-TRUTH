@@ -714,11 +714,11 @@ def run_ingestion_pipeline() -> None:
 
     Uses exponential backoff for transient failures and structured logging.
     """
-    # Check if we're on Render free tier (lightweight mode)
-    # Only use lightweight mode for actual free tier instances
-    # Standard tier and above should use full pipeline
-    if os.getenv("RENDER_INSTANCE_TYPE", "").lower() == "free":
-        logger.info("🪶 Running lightweight pipeline for Render free tier...")
+    # Check if we're on Render (use lightweight mode by default to prevent timeouts)
+    # Full pipeline can hang on limited resources
+    # Standard tier+ can run heavier loads with proper configuration
+    if os.getenv("RENDER", "").lower() == "true":
+        logger.info("🪶 Running lightweight pipeline (Render environment detected)...")
         from app.workers.lightweight_scheduler import run_lightweight_ingestion_with_timeout
         result = run_lightweight_ingestion_with_timeout(timeout_seconds=25)
         logger.info(f"✅ Lightweight pipeline completed: {result}")

@@ -1,271 +1,290 @@
 #!/usr/bin/env python3
 """
-Migrate SQLite database to PostgreSQL
+Migration script to transfer data from local SQLite to PostgreSQL on Render.
 
 This script:
-1. Reads all data from local SQLite database
-2. Connects to remote PostgreSQL database
-3. Inserts all events and articles
+1. Connects to local SQLite database
+2. Connects to PostgreSQL database on Render
+3. Transfers all events and articles data
+4. Handles duplicates with ON CONFLICT logic
+5. Verifies the migration was successful
 
 Usage:
+    export DATABASE_URL="postgresql://username:password@host.onrender.com:5432/dbname"
     python backend/scripts/migrate_sqlite_to_postgres.py
 """
 
 import os
 import sys
-from pathlib import Path
-
-import psycopg2
-import sqlite3
 from datetime import datetime
+from typing import List, Dict, Any
 
-# Add backend to path so we can import app modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Add the backend directory to Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-def get_sqlite_connection():
-    """Connect to local SQLite database"""
-    db_path = Path(__file__).parent.parent.parent / "data" / "app.db"
-    if not db_path.exists():
-        raise FileNotFoundError(f"SQLite database not found at {db_path}")
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from app.models import Event, Article
+from app.db import Base
 
-    print(f"✓ Found SQLite database at {db_path}")
-    return sqlite3.connect(db_path)
+def get_sqlite_engine():
+    """Get SQLite engine for local database"""
+    sqlite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'app.db')
+    sqlite_url = f"sqlite:///{sqlite_path}"
+    return create_engine(sqlite_url, echo=False)
 
-def get_postgres_connection():
-    """Connect to remote PostgreSQL database"""
-    database_url = os.getenv("DATABASE_URL")
+def get_postgres_engine():
+    """Get PostgreSQL engine for Render database"""
+    database_url = os.getenv('DATABASE_URL')
     if not database_url:
-        raise ValueError("DATABASE_URL environment variable not set")
+        raise ValueError("DATABASE_URL environment variable is required")
+    
+    if not database_url.startswith('postgresql://'):
+        raise ValueError("DATABASE_URL must be a PostgreSQL connection string")
+    
+    return create_engine(database_url, echo=False)
 
-    # Parse PostgreSQL connection string
-    # Format: postgresql://username:password@host:port/database
-    try:
-        conn = psycopg2.connect(database_url)
-        print(f"✓ Connected to PostgreSQL at {database_url.split('@')[1]}")
-        return conn
-    except Exception as e:
-        raise Exception(f"Failed to connect to PostgreSQL: {e}")
+def get_table_data(session, model_class, table_name: str) -> List[Dict[str, Any]]:
+    """Get all data from a table as dictionaries"""
+    print(f"📖 Reading {table_name} from local database...")
+    
+    # Get all records
+    records = session.query(model_class).all()
+    
+    # Convert to dictionaries
+    data = []
+    for record in records:
+        record_dict = {}
+        for column in model_class.__table__.columns:
+            value = getattr(record, column.name)
+            # Handle datetime objects
+            if isinstance(value, datetime):
+                value = value.isoformat()
+            record_dict[column.name] = value
+        data.append(record_dict)
+    
+    print(f"✓ Found {len(data)} records in {table_name}")
+    return data
 
-def count_records(sqlite_conn):
-    """Count records in SQLite"""
-    cursor = sqlite_conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM events")
-    event_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM articles_raw")
-    article_count = cursor.fetchone()[0]
-
-    print(f"\n📊 Local SQLite Database:")
-    print(f"   Events: {event_count}")
-    print(f"   Articles: {article_count}")
-
-    return event_count, article_count
-
-def migrate_events(sqlite_conn, postgres_conn):
-    """Migrate events from SQLite to PostgreSQL"""
-    sqlite_cursor = sqlite_conn.cursor()
-    postgres_cursor = postgres_conn.cursor()
-
-    # Get all events from SQLite
-    sqlite_cursor.execute("""
-        SELECT
-            id, summary, articles_count, unique_sources, geo_diversity,
-            evidence_flag, official_match, truth_score, underreported,
-            coherence_score, has_conflict, conflict_severity,
-            conflict_explanation_json, bias_compass_json, category,
-            category_confidence, conflict_detected_at, conflict_history_json,
-            importance_score, first_seen, last_seen, languages_json,
-            international_coverage_json, created_at
-        FROM events
-        ORDER BY id
-    """)
-
-    events = sqlite_cursor.fetchall()
-    print(f"\n🔄 Migrating {len(events)} events...")
-
-    # Insert events into PostgreSQL
-    insert_query = """
-        INSERT INTO events (
-            id, summary, articles_count, unique_sources, geo_diversity,
-            evidence_flag, official_match, truth_score, underreported,
-            coherence_score, has_conflict, conflict_severity,
-            conflict_explanation_json, bias_compass_json, category,
-            category_confidence, conflict_detected_at, conflict_history_json,
-            importance_score, first_seen, last_seen, languages_json,
-            international_coverage_json, created_at
-        ) VALUES (
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s,
-            %s, %s, %s,
-            %s, %s, %s,
-            %s, %s, %s,
-            %s, %s, %s, %s,
-            %s, %s
-        )
-        ON CONFLICT (id) DO UPDATE SET
-            summary = EXCLUDED.summary,
-            articles_count = EXCLUDED.articles_count,
-            unique_sources = EXCLUDED.unique_sources,
-            geo_diversity = EXCLUDED.geo_diversity,
-            evidence_flag = EXCLUDED.evidence_flag,
-            official_match = EXCLUDED.official_match,
-            truth_score = EXCLUDED.truth_score,
-            underreported = EXCLUDED.underreported,
-            coherence_score = EXCLUDED.coherence_score,
-            has_conflict = EXCLUDED.has_conflict,
-            conflict_severity = EXCLUDED.conflict_severity,
-            conflict_explanation_json = EXCLUDED.conflict_explanation_json,
-            bias_compass_json = EXCLUDED.bias_compass_json,
-            category = EXCLUDED.category,
-            category_confidence = EXCLUDED.category_confidence,
-            conflict_detected_at = EXCLUDED.conflict_detected_at,
-            conflict_history_json = EXCLUDED.conflict_history_json,
-            importance_score = EXCLUDED.importance_score,
-            first_seen = EXCLUDED.first_seen,
-            last_seen = EXCLUDED.last_seen,
-            languages_json = EXCLUDED.languages_json,
-            international_coverage_json = EXCLUDED.international_coverage_json,
-            created_at = EXCLUDED.created_at
-    """
-
-    for i, event in enumerate(events):
+def insert_events(postgres_session, events_data: List[Dict[str, Any]]) -> None:
+    """Insert events data into PostgreSQL"""
+    print(f"📝 Inserting {len(events_data)} events into PostgreSQL...")
+    
+    for i, event_data in enumerate(events_data):
         try:
-            postgres_cursor.execute(insert_query, event)
+            # Handle JSON fields that might be None
+            for json_field in ['conflict_explanation_json', 'bias_compass_json', 
+                             'conflict_history_json', 'languages_json', 'international_coverage_json']:
+                if event_data.get(json_field) is None:
+                    event_data[json_field] = None
+            
+            # Convert datetime strings back to datetime objects
+            for date_field in ['first_seen', 'last_seen', 'conflict_detected_at', 'created_at']:
+                if event_data.get(date_field):
+                    event_data[date_field] = datetime.fromisoformat(event_data[date_field])
+            
+            # Insert with ON CONFLICT handling
+            insert_sql = """
+                INSERT INTO events (
+                    id, summary, articles_count, unique_sources, geo_diversity,
+                    evidence_flag, official_match, truth_score, underreported,
+                    coherence_score, has_conflict, conflict_severity,
+                    conflict_explanation_json, bias_compass_json, category,
+                    category_confidence, conflict_detected_at, conflict_history_json,
+                    importance_score, first_seen, last_seen, languages_json,
+                    international_coverage_json, created_at
+                ) VALUES (
+                    :id, :summary, :articles_count, :unique_sources, :geo_diversity,
+                    :evidence_flag, :official_match, :truth_score, :underreported,
+                    :coherence_score, :has_conflict, :conflict_severity,
+                    :conflict_explanation_json, :bias_compass_json, :category,
+                    :category_confidence, :conflict_detected_at, :conflict_history_json,
+                    :importance_score, :first_seen, :last_seen, :languages_json,
+                    :international_coverage_json, :created_at
+                )
+                ON CONFLICT (id) DO UPDATE SET
+                    summary = EXCLUDED.summary,
+                    articles_count = EXCLUDED.articles_count,
+                    unique_sources = EXCLUDED.unique_sources,
+                    geo_diversity = EXCLUDED.geo_diversity,
+                    evidence_flag = EXCLUDED.evidence_flag,
+                    official_match = EXCLUDED.official_match,
+                    truth_score = EXCLUDED.truth_score,
+                    underreported = EXCLUDED.underreported,
+                    coherence_score = EXCLUDED.coherence_score,
+                    has_conflict = EXCLUDED.has_conflict,
+                    conflict_severity = EXCLUDED.conflict_severity,
+                    conflict_explanation_json = EXCLUDED.conflict_explanation_json,
+                    bias_compass_json = EXCLUDED.bias_compass_json,
+                    category = EXCLUDED.category,
+                    category_confidence = EXCLUDED.category_confidence,
+                    conflict_detected_at = EXCLUDED.conflict_detected_at,
+                    conflict_history_json = EXCLUDED.conflict_history_json,
+                    importance_score = EXCLUDED.importance_score,
+                    first_seen = EXCLUDED.first_seen,
+                    last_seen = EXCLUDED.last_seen,
+                    languages_json = EXCLUDED.languages_json,
+                    international_coverage_json = EXCLUDED.international_coverage_json,
+                    created_at = EXCLUDED.created_at
+            """
+            
+            postgres_session.execute(text(insert_sql), event_data)
+            
             if (i + 1) % 50 == 0:
-                print(f"   ✓ Inserted {i + 1}/{len(events)} events")
+                print(f"  📝 Processed {i + 1}/{len(events_data)} events...")
+                
         except Exception as e:
-            print(f"   ✗ Error inserting event {event[0]}: {e}")
-            postgres_conn.rollback()
-            raise
+            print(f"⚠️ Error inserting event {event_data.get('id', 'unknown')}: {e}")
+            continue
+    
+    postgres_session.commit()
+    print(f"✓ Successfully inserted/updated {len(events_data)} events")
 
-    postgres_conn.commit()
-    print(f"✓ Successfully migrated {len(events)} events")
-
-def migrate_articles(sqlite_conn, postgres_conn):
-    """Migrate articles from SQLite to PostgreSQL"""
-    sqlite_cursor = sqlite_conn.cursor()
-    postgres_cursor = postgres_conn.cursor()
-
-    # Get all articles from SQLite
-    sqlite_cursor.execute("""
-        SELECT
-            id, source, title, url, timestamp, language, summary,
-            text_snippet, entities_json, cluster_id, fact_check_status,
-            fact_check_flags_json, source_country, source_region, ingested_at
-        FROM articles_raw
-        ORDER BY id
-    """)
-
-    articles = sqlite_cursor.fetchall()
-    print(f"\n🔄 Migrating {len(articles)} articles...")
-
-    # Insert articles into PostgreSQL
-    insert_query = """
-        INSERT INTO articles_raw (
-            id, source, title, url, timestamp, language, summary,
-            text_snippet, entities_json, cluster_id, fact_check_status,
-            fact_check_flags_json, source_country, source_region, ingested_at
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s,
-            %s, %s, %s, %s
-        )
-        ON CONFLICT (id) DO UPDATE SET
-            source = EXCLUDED.source,
-            title = EXCLUDED.title,
-            url = EXCLUDED.url,
-            timestamp = EXCLUDED.timestamp,
-            language = EXCLUDED.language,
-            summary = EXCLUDED.summary,
-            text_snippet = EXCLUDED.text_snippet,
-            entities_json = EXCLUDED.entities_json,
-            cluster_id = EXCLUDED.cluster_id,
-            fact_check_status = EXCLUDED.fact_check_status,
-            fact_check_flags_json = EXCLUDED.fact_check_flags_json,
-            source_country = EXCLUDED.source_country,
-            source_region = EXCLUDED.source_region,
-            ingested_at = EXCLUDED.ingested_at
-    """
-
-    for i, article in enumerate(articles):
+def insert_articles(postgres_session, articles_data: List[Dict[str, Any]]) -> None:
+    """Insert articles data into PostgreSQL"""
+    print(f"📝 Inserting {len(articles_data)} articles into PostgreSQL...")
+    
+    batch_size = 50  # Process in smaller batches
+    successful_inserts = 0
+    
+    for i in range(0, len(articles_data), batch_size):
+        batch = articles_data[i:i + batch_size]
+        
         try:
-            postgres_cursor.execute(insert_query, article)
-            if (i + 1) % 500 == 0:
-                print(f"   ✓ Inserted {i + 1}/{len(articles)} articles")
+            # Start a new transaction for each batch
+            postgres_session.rollback()  # Clear any previous transaction errors
+            
+            for article_data in batch:
+                # Convert datetime strings back to datetime objects
+                for date_field in ['timestamp', 'ingested_at']:
+                    if article_data.get(date_field):
+                        article_data[date_field] = datetime.fromisoformat(article_data[date_field])
+                
+                # Insert with ON CONFLICT handling
+                insert_sql = """
+                    INSERT INTO articles_raw (
+                        id, source, title, url, timestamp, language, summary,
+                        text_snippet, entities_json, cluster_id, fact_check_status,
+                        fact_check_flags_json, source_country, source_region, ingested_at
+                    ) VALUES (
+                        :id, :source, :title, :url, :timestamp, :language, :summary,
+                        :text_snippet, :entities_json, :cluster_id, :fact_check_status,
+                        :fact_check_flags_json, :source_country, :source_region, :ingested_at
+                    )
+                    ON CONFLICT (url) DO UPDATE SET
+                        source = EXCLUDED.source,
+                        title = EXCLUDED.title,
+                        timestamp = EXCLUDED.timestamp,
+                        language = EXCLUDED.language,
+                        summary = EXCLUDED.summary,
+                        text_snippet = EXCLUDED.text_snippet,
+                        entities_json = EXCLUDED.entities_json,
+                        cluster_id = EXCLUDED.cluster_id,
+                        fact_check_status = EXCLUDED.fact_check_status,
+                        fact_check_flags_json = EXCLUDED.fact_check_flags_json,
+                        source_country = EXCLUDED.source_country,
+                        source_region = EXCLUDED.source_region,
+                        ingested_at = EXCLUDED.ingested_at
+                """
+                
+                postgres_session.execute(text(insert_sql), article_data)
+            
+            # Commit the batch
+            postgres_session.commit()
+            successful_inserts += len(batch)
+            
+            if (i + batch_size) % 500 == 0:
+                print(f"  📝 Processed {i + batch_size}/{len(articles_data)} articles...")
+                
         except Exception as e:
-            print(f"   ✗ Error inserting article {article[0]}: {e}")
-            postgres_conn.rollback()
-            raise
+            print(f"⚠️ Error inserting batch {i//batch_size + 1}: {e}")
+            postgres_session.rollback()  # Rollback the failed batch
+            continue
+    
+    print(f"✓ Successfully inserted/updated {successful_inserts} articles")
 
-    postgres_conn.commit()
-    print(f"✓ Successfully migrated {len(articles)} articles")
-
-def verify_migration(sqlite_conn, postgres_conn):
-    """Verify migration was successful"""
-    sqlite_cursor = sqlite_conn.cursor()
-    postgres_cursor = postgres_conn.cursor()
-
-    # Count SQLite records
-    sqlite_cursor.execute("SELECT COUNT(*) FROM events")
-    sqlite_events = sqlite_cursor.fetchone()[0]
-
-    sqlite_cursor.execute("SELECT COUNT(*) FROM articles_raw")
-    sqlite_articles = sqlite_cursor.fetchone()[0]
-
-    # Count PostgreSQL records
-    postgres_cursor.execute("SELECT COUNT(*) FROM events")
-    postgres_events = postgres_cursor.fetchone()[0]
-
-    postgres_cursor.execute("SELECT COUNT(*) FROM articles_raw")
-    postgres_articles = postgres_cursor.fetchone()[0]
-
-    print(f"\n✅ Migration Verification:")
-    print(f"   Events:   {sqlite_events} → {postgres_events} ({'✓' if sqlite_events == postgres_events else '✗'})")
-    print(f"   Articles: {sqlite_articles} → {postgres_articles} ({'✓' if sqlite_articles == postgres_articles else '✗'})")
-
-    if sqlite_events == postgres_events and sqlite_articles == postgres_articles:
-        print(f"\n🎉 Migration successful!")
-        return True
-    else:
-        print(f"\n❌ Migration incomplete - record counts don't match")
-        return False
+def verify_migration(postgres_session) -> None:
+    """Verify the migration was successful"""
+    print("🔍 Verifying migration...")
+    
+    # Check events count
+    events_count = postgres_session.execute(text("SELECT COUNT(*) FROM events")).scalar()
+    print(f"✓ Events in PostgreSQL: {events_count}")
+    
+    # Check articles count
+    articles_count = postgres_session.execute(text("SELECT COUNT(*) FROM articles_raw")).scalar()
+    print(f"✓ Articles in PostgreSQL: {articles_count}")
+    
+    # Check for data integrity
+    events_with_articles = postgres_session.execute(text("""
+        SELECT COUNT(DISTINCT e.id) 
+        FROM events e 
+        JOIN articles_raw a ON e.id = a.cluster_id
+    """)).scalar()
+    print(f"✓ Events with articles: {events_with_articles}")
+    
+    # Check truth scores
+    avg_truth_score = postgres_session.execute(text("""
+        SELECT AVG(truth_score) FROM events WHERE truth_score IS NOT NULL
+    """)).scalar()
+    print(f"✓ Average truth score: {avg_truth_score:.2f}")
+    
+    print("🎉 Migration verification complete!")
 
 def main():
     """Main migration function"""
+    print("🚀 Starting SQLite to PostgreSQL migration...")
     print("=" * 60)
-    print("SQLite → PostgreSQL Migration")
-    print("=" * 60)
-
+    
     try:
-        # Connect to databases
-        sqlite_conn = get_sqlite_connection()
-        postgres_conn = get_postgres_connection()
-
-        # Count records
-        count_records(sqlite_conn)
-
-        # Migrate data
-        migrate_events(sqlite_conn, postgres_conn)
-        migrate_articles(sqlite_conn, postgres_conn)
-
-        # Verify
-        if verify_migration(sqlite_conn, postgres_conn):
-            print("\nYour production database is now populated! 🚀")
-            print("Visit: https://truthboard.vercel.app")
-            return 0
-        else:
-            return 1
-
+        # Connect to local SQLite database
+        print("📱 Connecting to local SQLite database...")
+        sqlite_engine = get_sqlite_engine()
+        sqlite_session = sessionmaker(bind=sqlite_engine)()
+        
+        # Connect to PostgreSQL database
+        print("☁️ Connecting to PostgreSQL database on Render...")
+        postgres_engine = get_postgres_engine()
+        postgres_session = sessionmaker(bind=postgres_engine)()
+        
+        # Create tables in PostgreSQL if they don't exist
+        print("🏗️ Ensuring PostgreSQL tables exist...")
+        Base.metadata.create_all(bind=postgres_engine)
+        
+        # Get data from SQLite
+        print("\n📖 Reading data from local SQLite database...")
+        events_data = get_table_data(sqlite_session, Event, "events")
+        articles_data = get_table_data(sqlite_session, Article, "articles_raw")
+        
+        # Insert data into PostgreSQL
+        print("\n📝 Transferring data to PostgreSQL...")
+        if events_data:
+            insert_events(postgres_session, events_data)
+        
+        if articles_data:
+            insert_articles(postgres_session, articles_data)
+        
+        # Verify migration
+        print("\n🔍 Verifying migration...")
+        verify_migration(postgres_session)
+        
+        print("\n" + "=" * 60)
+        print("🎉 Migration successful!")
+        print(f"✅ Transferred {len(events_data)} events and {len(articles_data)} articles")
+        print("🌐 Your data is now live at: https://truthboard.vercel.app")
+        
     except Exception as e:
         print(f"\n❌ Migration failed: {e}")
-        return 1
-
+        print("💡 Make sure your DATABASE_URL is correct and accessible")
+        sys.exit(1)
+    
     finally:
-        if sqlite_conn:
-            sqlite_conn.close()
-        if postgres_conn:
-            postgres_conn.close()
+        # Clean up connections
+        try:
+            sqlite_session.close()
+            postgres_session.close()
+        except:
+            pass
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

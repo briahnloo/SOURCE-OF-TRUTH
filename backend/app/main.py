@@ -42,13 +42,13 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize database: {e}")
         sys.exit(1)
 
-    # Start background scheduler if enabled (default: true on non-free tier)
-    # Check environment variable (ENABLE_SCHEDULER) or run if Standard tier
+    # Start background scheduler if explicitly enabled
+    # Scheduler can cause timeouts if pipeline is too heavy
+    # Temporarily disabled to restore API functionality
     enable_scheduler = os.getenv("ENABLE_SCHEDULER", "").lower() == "true"
-    is_standard_tier = os.getenv("RENDER_INSTANCE_TYPE", "").lower() != "free"
 
-    # If on Standard tier or explicitly enabled, start scheduler
-    if enable_scheduler or is_standard_tier:
+    # Only start scheduler if explicitly enabled via environment variable
+    if enable_scheduler:
         print("🔄 Starting background scheduler...")
         try:
             from apscheduler.executors.pool import ThreadPoolExecutor
@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
             # If scheduler fails to start, continue without it
             pass
     else:
-        print("⏭️ Scheduler disabled (free tier detected)")
+        print("⏭️ Scheduler disabled (set ENABLE_SCHEDULER=true to enable)")
 
     yield
 

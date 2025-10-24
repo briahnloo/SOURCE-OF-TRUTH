@@ -42,13 +42,13 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize database: {e}")
         sys.exit(1)
 
-    # Start background scheduler if explicitly enabled
-    # Scheduler can cause timeouts if pipeline is too heavy
-    # Temporarily disabled to restore API functionality
-    enable_scheduler = os.getenv("ENABLE_SCHEDULER", "").lower() == "true"
+    # Start background scheduler (always enabled for production)
+    # Uses lightweight pipeline on Render to prevent timeouts
+    # Scheduler runs in separate thread pool to not block API
+    enable_scheduler = True  # Always enabled in production
 
-    # Only start scheduler if explicitly enabled via environment variable
-    if enable_scheduler:
+    # Start scheduler
+    if True:  # Always run
         print("🔄 Starting background scheduler...")
         try:
             from apscheduler.executors.pool import ThreadPoolExecutor

@@ -262,8 +262,10 @@ def main():
         return 1
 
     finally:
-        sqlite_conn.close()
-        postgres_conn.close()
+        if sqlite_conn:
+            sqlite_conn.close()
+        if postgres_conn:
+            postgres_conn.close()
 
 if __name__ == "__main__":
     sys.exit(main())

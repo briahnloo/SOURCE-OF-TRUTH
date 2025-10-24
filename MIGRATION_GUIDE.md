@@ -20,23 +20,41 @@ Your local database has **297 events** and **4,901 articles**. This guide will u
 
 ### Step 1: Get Your Database Connection String
 
-From the DEPLOYMENT_README.md, your PostgreSQL connection string is:
+You need the **External** PostgreSQL connection string from Render (for access from outside Render's network).
 
+**To find it:**
+
+1. Go to https://dashboard.render.com
+2. Click on your PostgreSQL database instance (`truthboard-db`)
+3. Scroll to **Connections** section
+4. Copy the **External Database URL** (NOT the Internal one)
+5. It should look like: `postgresql://username:password@host.onrender.com:5432/dbname`
+
+**Example** (your actual URL):
 ```
-postgresql://truthlayer:hLx2iGTigwwUpLwH8WnwMzpNrJKpsSDM@dpg-d3qr8o56ubrc73868q20-a/truthlayer
+postgresql://truthlayer:hLx2iGTigwwUpLwH8WnwMzpNrJKpsSDM@dpg-d3qr8o56ubrc73868q20-a.onrender.com:5432/truthlayer
 ```
+
+⚠️ **Important**:
+- Make sure it includes `.onrender.com` in the hostname
+- Make sure it includes the port (`:5432`)
+- Copy the entire URL exactly as shown in Render
 
 **Keep this handy** - you'll need it in Step 2.
 
 ### Step 2: Set Environment Variable Locally
 
-Open your terminal and run this command:
+Open your terminal and run this command (using the URL you copied from Render):
 
 ```bash
-export DATABASE_URL="postgresql://truthlayer:hLx2iGTigwwUpLwH8WnwMzpNrJKpsSDM@dpg-d3qr8o56ubrc73868q20-a/truthlayer"
+export DATABASE_URL="postgresql://truthlayer:hLx2iGTigwwUpLwH8WnwMzpNrJKpsSDM@dpg-d3qr8o56ubrc73868q20-a.onrender.com:5432/truthlayer"
 ```
 
-**Note**: Replace the connection string with your actual one if it's different.
+**Make sure to:**
+- Replace with the actual connection string from your Render dashboard
+- Include the full hostname with `.onrender.com`
+- Include the port `:5432`
+- Keep the credentials exactly as shown in Render
 
 ### Step 3: Run the Migration Script
 

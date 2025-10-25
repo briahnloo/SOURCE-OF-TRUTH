@@ -45,16 +45,23 @@ RSS_FEEDS = [
 
 def fetch_rss_articles() -> List[Dict[str, Any]]:
     """
-    Fetch articles from all RSS feeds.
+    Fetch articles from all RSS feeds with per-feed timeouts.
 
     Returns:
         List of article dictionaries with keys: title, url, source, timestamp, summary
     """
+    import threading
     articles = []
 
-    for feed_url in RSS_FEEDS:
+    def fetch_single_feed(feed_url: str, results: List[Dict[str, Any]]):
+        """Fetch a single RSS feed with timeout protection"""
         try:
+            # feedparser.parse() has no built-in timeout, use threading timeout
             feed = feedparser.parse(feed_url)
+
+            # Check if parsing failed
+            if not feed.entries:
+                return
 
             # Extract domain from feed URL as source
             try:
@@ -81,7 +88,7 @@ def fetch_rss_articles() -> List[Dict[str, Any]]:
                 elif hasattr(entry, "description"):
                     summary = entry.description[:500]
 
-                articles.append(
+                results.append(
                     {
                         "title": entry.title.strip(),
                         "url": entry.link,
@@ -93,7 +100,21 @@ def fetch_rss_articles() -> List[Dict[str, Any]]:
 
         except Exception as e:
             print(f"❌ RSS feed error ({feed_url}): {e}")
-            continue
+
+    # Fetch all feeds in parallel with timeout per feed (10 seconds)
+    threads = []
+    results_lock = threading.Lock()
+
+    for feed_url in RSS_FEEDS:
+        thread = threading.Thread(target=fetch_single_feed, args=(feed_url, articles), daemon=True)
+        thread.start()
+        threads.append((thread, feed_url))
+
+    # Wait for all threads with timeout (10 seconds per feed, but process all in parallel)
+    for thread, feed_url in threads:
+        thread.join(timeout=10)
+        if thread.is_alive():
+            print(f"⏰ RSS feed timeout after 10s ({feed_url})")
 
     print(f"✅ RSS: Fetched {len(articles)} articles from {len(RSS_FEEDS)} feeds")
     return articles

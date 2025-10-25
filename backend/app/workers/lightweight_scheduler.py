@@ -177,7 +177,7 @@ def run_lightweight_ingestion_with_timeout(timeout_seconds: int = 25) -> Dict:
             "articles_stored": 0,
             "events_created": 0,
             "events_scored": 0,
-            "errors": ["Timeout after 25 seconds"],
+            "errors": [f"Timeout after {timeout_seconds} seconds"],
             "duration_seconds": timeout_seconds
         }
 

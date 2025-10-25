@@ -120,15 +120,55 @@ def run_lightweight_ingestion() -> Dict:
             stats["errors"].append(f"Normalization: {str(e)}")
             return stats
         
-        # Step 3: Skip clustering in lightweight mode (too heavy for Render free tier)
-        # Clustering is CPU-intensive and causes timeouts on limited resources
-        logger.info("⊘ Step 3: Skipping clustering in lightweight mode")
-        stats["events_created"] = 0
+        # Step 3: Create events from articles (lightweight - no clustering)
+        # In lightweight mode, create one event per article for search functionality
+        # This enables search while avoiding expensive DBSCAN clustering
+        logger.info("📊 Step 3: Creating events from articles (lightweight mode)...")
+        try:
+            # Convert recent articles to events (one event per article, no clustering)
+            from sqlalchemy import text
 
-        # Step 4: Skip scoring in lightweight mode
-        logger.info("⊘ Step 4: Skipping scoring in lightweight mode")
+            # Get recent articles that don't have an associated event yet
+            recent_articles = db.query(Article).order_by(Article.id.desc()).limit(100).all()
+            events_created = 0
+
+            for article in recent_articles:
+                # Check if event already exists for this article
+                existing_event = db.query(Event).filter(Event.article_id == article.id).first()
+                if not existing_event:
+                    # Create a simple event from the article
+                    from datetime import datetime
+                    event = Event(
+                        title=article.title,
+                        description=article.summary or article.text_snippet,
+                        timestamp=article.timestamp or datetime.utcnow(),
+                        status="unscored",  # Mark as unscored for lightweight mode
+                        article_id=article.id,
+                        category="general",  # Default category for lightweight mode
+                        location_entities=article.entities_json,
+                        source_country=article.source_country,
+                    )
+                    try:
+                        db.add(event)
+                        db.flush()
+                        events_created += 1
+                    except Exception as e:
+                        db.rollback()
+                        logger.debug(f"Failed to create event for article {article.id}: {e}")
+
+            db.commit()
+            stats["events_created"] = events_created
+            logger.info(f"✅ Created {events_created} events from recent articles")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"⚠️  Event creation failed: {e}")
+            # Don't fail the whole pipeline, continue without events
+            stats["events_created"] = 0
+
+        # Step 4: Skip scoring in lightweight mode (too heavy for Render free tier)
+        logger.info("⊘ Step 4: Skipping scoring/clustering in lightweight mode")
         stats["events_scored"] = 0
-        
+
         db.close()
         
         # Calculate timing

@@ -139,31 +139,21 @@ def is_duplicate(article: Dict[str, Any], db: Session) -> bool:
     Check if article is a duplicate.
 
     Checks:
-        1. Exact URL match
-        2. High title similarity (>0.9) from same source
+        1. Exact URL match (primary deduplication method)
+
+    Note: Title-based deduplication disabled to maximize search results.
+    Similar articles from different sources are intentionally kept separate
+    to show multiple perspectives. Clustering will handle grouping later.
     """
-    # Check URL
+    # Check URL only - this is the most reliable deduplication signal
     existing = db.query(Article).filter(Article.url == article["url"]).first()
     if existing:
         return True
 
-    # Check title similarity within same source
-    source = article.get("source", "")
-    title = article.get("title", "")
-
-    if source and title:
-        recent_articles = (
-            db.query(Article)
-            .filter(Article.source == source)
-            .order_by(Article.ingested_at.desc())
-            .limit(50)
-            .all()
-        )
-
-        for existing_article in recent_articles:
-            similarity = calculate_title_similarity(title, existing_article.title)
-            if similarity > 0.9:
-                return True
+    # Note: Removed title similarity check (similarity > 0.9)
+    # This was too aggressive and filtered out legitimate articles
+    # with similar titles from different sources or outlets.
+    # The clustering pipeline will handle semantic deduplication.
 
     return False
 

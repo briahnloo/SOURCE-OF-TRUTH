@@ -191,16 +191,20 @@ def normalize_and_store(articles: List[Dict[str, Any]], db: Session) -> tuple[in
     # This fixes the "duplicate key value violates unique constraint" error
     # when the sequence is behind the max ID in the table
     try:
-        db.execute(text("""
-            SELECT setval('articles_raw_id_seq',
-                          (SELECT COALESCE(MAX(id), 1) FROM articles_raw) + 1)
-        """))
+        # Get the current max ID and reset sequence to be one higher
+        result = db.execute(text("""
+            SELECT COALESCE(MAX(id), 0) as max_id FROM articles_raw
+        """)).fetchone()
+        max_id = result[0] if result else 0
+
+        # Reset the sequence to max_id + 1
+        db.execute(text(f"SELECT setval('articles_raw_id_seq', {max_id + 1}, false)"))
         db.commit()
+        print(f"✅ PostgreSQL sequence reset to {max_id + 1}")
     except Exception as e:
-        # Sequence might not exist or table might be empty - this is fine
         db.rollback()
-        # Don't fail the entire pipeline on sequence reset error
-        pass
+        print(f"⚠️ Failed to reset sequence: {e}")
+        # Continue anyway - articles can still be stored
 
     # Pre-filter articles (validation + dedup + language)
     articles_to_store = []

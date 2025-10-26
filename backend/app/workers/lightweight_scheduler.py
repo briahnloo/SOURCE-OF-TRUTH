@@ -125,36 +125,32 @@ def run_lightweight_ingestion() -> Dict:
         # This enables search while avoiding expensive DBSCAN clustering
         logger.info("📊 Step 3: Creating events from articles (lightweight mode)...")
         try:
-            # Convert recent articles to events (one event per article, no clustering)
-            from sqlalchemy import text
+            from datetime import datetime
 
-            # Get recent articles that don't have an associated event yet
-            recent_articles = db.query(Article).order_by(Article.id.desc()).limit(100).all()
+            # Get recent articles (last 50 stored in this cycle)
+            recent_articles = db.query(Article).order_by(Article.id.desc()).limit(50).all()
             events_created = 0
 
             for article in recent_articles:
-                # Check if event already exists for this article
-                existing_event = db.query(Event).filter(Event.article_id == article.id).first()
-                if not existing_event:
+                try:
                     # Create a simple event from the article
-                    from datetime import datetime
+                    # Each article becomes one event in lightweight mode
                     event = Event(
-                        title=article.title,
-                        description=article.summary or article.text_snippet,
-                        timestamp=article.timestamp or datetime.utcnow(),
-                        status="unscored",  # Mark as unscored for lightweight mode
-                        article_id=article.id,
+                        summary=article.title or article.summary or "News article",
+                        articles_count=1,  # Lightweight: each event is from single article
+                        unique_sources=1,
+                        truth_score=50.0,  # Default score for lightweight mode
+                        first_seen=article.timestamp or datetime.utcnow(),
+                        last_seen=article.timestamp or datetime.utcnow(),
+                        languages_json='["en"]',
                         category="general",  # Default category for lightweight mode
-                        location_entities=article.entities_json,
-                        source_country=article.source_country,
                     )
-                    try:
-                        db.add(event)
-                        db.flush()
-                        events_created += 1
-                    except Exception as e:
-                        db.rollback()
-                        logger.debug(f"Failed to create event for article {article.id}: {e}")
+                    db.add(event)
+                    db.flush()
+                    events_created += 1
+                except Exception as e:
+                    db.rollback()
+                    logger.debug(f"Failed to create event for article {article.id}: {e}")
 
             db.commit()
             stats["events_created"] = events_created

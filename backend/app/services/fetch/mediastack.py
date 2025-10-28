@@ -5,6 +5,8 @@ from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 import requests
+from loguru import logger
+
 from app.config import settings
 
 
@@ -19,7 +21,7 @@ def fetch_mediastack_articles() -> List[Dict[str, Any]]:
 
     # Skip if no API key provided
     if not settings.mediastack_key:
-        print("ℹ️  Mediastack: Skipped (no API key)")
+        logger.debug("Mediastack: Skipped (no API key)")
         return articles
 
     try:
@@ -66,11 +68,11 @@ def fetch_mediastack_articles() -> List[Dict[str, Any]]:
                     }
                 )
 
-        print(f"✅ Mediastack: Fetched {len(articles)} articles")
+        logger.info(f"✅ Mediastack: Fetched {len(articles)} articles")
 
     except requests.RequestException as e:
-        print(f"❌ Mediastack fetch error: {e}")
+        logger.warning(f"Mediastack fetch error: {e}")
     except Exception as e:
-        print(f"❌ Mediastack processing error: {e}")
+        logger.warning(f"Mediastack processing error: {e}")
 
     return articles

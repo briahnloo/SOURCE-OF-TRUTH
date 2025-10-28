@@ -5,6 +5,8 @@ from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 import requests
+from loguru import logger
+
 from app.config import settings
 
 
@@ -19,7 +21,7 @@ def fetch_newsapi_articles() -> List[Dict[str, Any]]:
 
     # Skip if no API key provided
     if not settings.newsapi_key:
-        print("ℹ️  NewsAPI: Skipped (no API key)")
+        logger.debug("NewsAPI: Skipped (no API key)")
         return articles
 
     try:
@@ -66,11 +68,11 @@ def fetch_newsapi_articles() -> List[Dict[str, Any]]:
                     }
                 )
 
-        print(f"✅ NewsAPI: Fetched {len(articles)} articles")
+        logger.info(f"✅ NewsAPI: Fetched {len(articles)} articles")
 
     except requests.RequestException as e:
-        print(f"❌ NewsAPI fetch error: {e}")
+        logger.warning(f"NewsAPI fetch error: {e}")
     except Exception as e:
-        print(f"❌ NewsAPI processing error: {e}")
+        logger.warning(f"NewsAPI processing error: {e}")
 
     return articles

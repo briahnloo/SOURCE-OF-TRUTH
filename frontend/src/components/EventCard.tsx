@@ -67,10 +67,10 @@ export default function EventCard({ event }: EventCardProps) {
             <div className="absolute inset-0 bg-gradient-to-r from-primary-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
             {/* Content */}
-            <div className="relative p-8">
+            <div className="relative p-4 sm:p-6 md:p-8">
                 {/* Header with title and metadata */}
                 <div className="mb-6">
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-4 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors leading-tight">
+                    <h2 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-4 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors leading-tight">
                         {event.summary}
                     </h2>
 

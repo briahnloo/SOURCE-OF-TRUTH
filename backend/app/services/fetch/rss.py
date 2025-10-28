@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 import feedparser
+from loguru import logger
 
 # RSS feed URLs
 RSS_FEEDS = [
@@ -99,7 +100,7 @@ def fetch_rss_articles() -> List[Dict[str, Any]]:
                 )
 
         except Exception as e:
-            print(f"❌ RSS feed error ({feed_url}): {e}")
+            logger.debug(f"RSS feed error ({feed_url}): {e}")
 
     # Fetch all feeds in parallel with timeout per feed (10 seconds)
     threads = []
@@ -114,7 +115,7 @@ def fetch_rss_articles() -> List[Dict[str, Any]]:
     for thread, feed_url in threads:
         thread.join(timeout=10)
         if thread.is_alive():
-            print(f"⏰ RSS feed timeout after 10s ({feed_url})")
+            logger.debug(f"RSS feed timeout after 10s ({feed_url})")
 
-    print(f"✅ RSS: Fetched {len(articles)} articles from {len(RSS_FEEDS)} feeds")
+    logger.info(f"✅ RSS: Fetched {len(articles)} articles from {len(RSS_FEEDS)} feeds")
     return articles

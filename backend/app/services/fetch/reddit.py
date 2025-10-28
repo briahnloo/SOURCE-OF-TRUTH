@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import requests
+from loguru import logger
 
 SUBREDDITS = ["worldnews", "news"]
 
@@ -68,9 +69,9 @@ def fetch_reddit_articles() -> List[Dict[str, Any]]:
 
         except requests.RequestException as e:
             # Reddit frequently blocks automated requests, skip gracefully
-            print(f"⚠️ Reddit blocked request (r/{subreddit}): {e}")
+            logger.debug(f"Reddit blocked request (r/{subreddit}): {e}")
         except Exception as e:
-            print(f"⚠️ Reddit processing error (r/{subreddit}): {e}")
+            logger.debug(f"Reddit processing error (r/{subreddit}): {e}")
 
-    print(f"✅ Reddit: Fetched {len(articles)} posts from {len(SUBREDDITS)} subreddits")
+    logger.info(f"✅ Reddit: Fetched {len(articles)} posts from {len(SUBREDDITS)} subreddits")
     return articles

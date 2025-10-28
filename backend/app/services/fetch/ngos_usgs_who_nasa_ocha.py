@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import feedparser
 import requests
+from loguru import logger
 
 
 def fetch_reliefweb() -> List[Dict[str, Any]]:
@@ -45,10 +46,10 @@ def fetch_reliefweb() -> List[Dict[str, Any]]:
                     }
                 )
 
-        print(f"✅ ReliefWeb: Fetched {len(articles)} reports")
+        logger.info(f"✅ ReliefWeb: Fetched {len(articles)} reports")
 
     except Exception as e:
-        print(f"❌ ReliefWeb fetch error: {e}")
+        logger.debug(f"ReliefWeb fetch error: {e}")
 
     return articles
 
@@ -93,10 +94,10 @@ def fetch_usgs_earthquakes() -> List[Dict[str, Any]]:
                     }
                 )
 
-        print(f"✅ USGS: Fetched {len(articles)} earthquake events")
+        logger.info(f"✅ USGS: Fetched {len(articles)} earthquake events")
 
     except Exception as e:
-        print(f"❌ USGS fetch error: {e}")
+        logger.debug(f"USGS fetch error: {e}")
 
     return articles
 
@@ -132,10 +133,10 @@ def fetch_who_don() -> List[Dict[str, Any]]:
                 }
             )
 
-        print(f"✅ WHO DON: Fetched {len(articles)} outbreak alerts")
+        logger.info(f"✅ WHO DON: Fetched {len(articles)} outbreak alerts")
 
     except Exception as e:
-        print(f"❌ WHO DON fetch error: {e}")
+        logger.debug(f"WHO DON fetch error: {e}")
 
     return articles
 
@@ -149,7 +150,7 @@ def fetch_nasa_firms() -> List[Dict[str, Any]]:
 
     # For MVP, we'll skip this since it requires registration
     # In production, add MAP_KEY to settings
-    print("ℹ️  NASA FIRMS: Skipped (requires MAP_KEY registration)")
+    logger.debug("NASA FIRMS: Skipped (requires MAP_KEY registration)")
 
     # Example implementation (commented out):
     # try:
@@ -226,10 +227,10 @@ def fetch_un_ocha() -> List[Dict[str, Any]]:
                     }
                 )
 
-        print(f"✅ UN OCHA: Fetched {len(articles)} humanitarian datasets")
+        logger.info(f"✅ UN OCHA: Fetched {len(articles)} humanitarian datasets")
 
     except Exception as e:
-        print(f"❌ UN OCHA fetch error: {e}")
+        logger.debug(f"UN OCHA fetch error: {e}")
 
     return articles
 

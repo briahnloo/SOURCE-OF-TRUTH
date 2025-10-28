@@ -56,14 +56,14 @@ export default function HeroSection() {
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
                 <div className="text-center">
                     {/* Main heading with gradient text */}
-                    <h1 className={`text-5xl md:text-7xl font-bold text-white mb-8 transition-all duration-1000 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <h1 className={`text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-8 transition-all duration-1000 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
                             The Truthboard
                         </span>
                     </h1>
 
                     {/* Subtitle */}
-                    <p className={`text-xl md:text-2xl text-white/90 mb-4 max-w-4xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <p className={`text-base sm:text-lg md:text-2xl text-white/90 mb-4 max-w-4xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         Multi-source news verification with confidence scoring and transparency
                     </p>
 
@@ -74,7 +74,7 @@ export default function HeroSection() {
                     </p>
 
                     {/* Stats Grid */}
-                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isClient && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <StatBadge
                             icon="🔍"
                             label="Verified Sources"

@@ -21,7 +21,8 @@ export default function RootLayout({
                     {/* Header */}
                     <header className="glass-effect sticky top-0 z-50 border-b border-gray-200/20 dark:border-gray-700/20">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex items-center justify-between h-16">
+                            {/* Desktop header */}
+                            <div className="hidden md:flex items-center justify-between h-16">
                                 <Link href="/" className="flex items-center space-x-3 group">
                                     <div className="w-12 h-12 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
                                         <span className="text-white font-bold text-2xl">T</span>
@@ -42,7 +43,7 @@ export default function RootLayout({
                                     </div>
                                 </Link>
 
-                                <nav className="hidden md:flex items-center space-x-1">
+                                <nav className="flex items-center space-x-1">
                                     <NavLink href="/">Confirmed</NavLink>
                                     <NavLink href="/developing">Developing</NavLink>
                                     <NavLink href="/conflicts">Conflicts</NavLink>
@@ -52,16 +53,34 @@ export default function RootLayout({
                                 </nav>
 
                                 {/* Search Bar */}
-                                <div className="hidden md:block">
+                                <SearchBar />
+                            </div>
+
+                            {/* Mobile header */}
+                            <div className="md:hidden">
+                                <div className="flex items-center justify-between h-14">
+                                    <Link href="/" className="flex items-center space-x-2 group">
+                                        <div className="w-10 h-10 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 rounded-lg flex items-center justify-center shadow-lg">
+                                            <span className="text-white font-bold text-lg">T</span>
+                                        </div>
+                                        <h1 className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                                            Truthboard
+                                        </h1>
+                                    </Link>
+                                </div>
+                                {/* Mobile search bar - full width */}
+                                <div className="px-0 py-2">
                                     <SearchBar />
                                 </div>
-
-                                {/* Mobile menu button */}
-                                <button className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
+                                {/* Mobile navigation */}
+                                <nav className="flex flex-col space-y-1 py-2 border-t border-gray-200/20 dark:border-gray-700/20">
+                                    <NavLink href="/">Confirmed</NavLink>
+                                    <NavLink href="/developing">Developing</NavLink>
+                                    <NavLink href="/conflicts">Conflicts</NavLink>
+                                    <NavLink href="/polarizing">Polarizing</NavLink>
+                                    <NavLink href="/flagged">Flagged</NavLink>
+                                    <NavLink href="/stats">Stats</NavLink>
+                                </nav>
                             </div>
                         </div>
                     </header>
@@ -73,8 +92,8 @@ export default function RootLayout({
 
                     {/* Footer */}
                     <footer className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-t border-gray-200/50 dark:border-gray-700/50 mt-16">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-8">
                                 {/* About */}
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -110,7 +129,7 @@ export default function RootLayout({
                                             📚 API Documentation
                                         </a>
                                         <a
-                                            href="https://github.com/your-repo"
+                                            href="https://github.com/briahnloo"
                                             className="block text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
                                             target="_blank"
                                             rel="noopener noreferrer"
@@ -140,8 +159,8 @@ export default function RootLayout({
                                 </div>
                             </div>
 
-                            <div className="border-t border-gray-200 dark:border-gray-700 pt-8">
-                                <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                            <div className="border-t border-gray-200 dark:border-gray-700 pt-6 sm:pt-8">
+                                <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 text-center sm:text-left">
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Built with FastAPI, Next.js, and sentence-transformers • MIT License
                                     </p>

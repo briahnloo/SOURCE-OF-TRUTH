@@ -146,7 +146,14 @@ def run_lightweight_ingestion() -> Dict:
                         category="general",  # Default category for lightweight mode
                     )
                     db.add(event)
-                    db.flush()
+                    db.flush()  # Flush to get the event ID
+
+                    # CRITICAL FIX: Link article to event by setting cluster_id
+                    # This enables search to find articles via cluster_id -> event mapping
+                    # Without this, search returns 0 results in lightweight mode
+                    article.cluster_id = event.id
+                    db.add(article)
+
                     events_created += 1
                 except Exception as e:
                     db.rollback()

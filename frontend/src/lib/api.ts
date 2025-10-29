@@ -252,6 +252,11 @@ class APIError extends Error {
 async function fetchAPI<T>(endpoint: string): Promise<T> {
     const url = `${getApiUrl()}${endpoint}`;
 
+    // Log API URL being used
+    if (typeof window !== 'undefined') {
+        console.log('[API] Using API URL:', getApiUrl(), 'for endpoint:', endpoint);
+    }
+
     // Check if backend is available first (only during SSR)
     if (typeof window === 'undefined') {
         const isAvailable = await isBackendAvailable();
@@ -287,7 +292,7 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
         }
 
         // Log the raw error for debugging
-        console.error('[API] Fetch error:', { endpoint, error, message: error instanceof Error ? error.message : String(error) });
+        console.error('[API] Fetch error:', { endpoint, error, message: error instanceof Error ? error.message : String(error), apiUrl: getApiUrl(), url });
 
         // More specific error handling
         if (error instanceof TypeError && error.message.includes('fetch failed')) {

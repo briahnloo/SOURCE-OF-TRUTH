@@ -6,6 +6,7 @@ from app.config import settings
 from app.core.json_utils import parse_json_body, parse_json_list, safe_json_loads
 from app.db import get_db
 from app.models import Article, Event
+from app.services.ranking import rank_events
 from app.schemas import (
     ArticleDetail,
     BiasCompass,
@@ -227,69 +228,13 @@ async def get_events(
     # Get total count
     total = query.count()
 
-    # IMPROVED SORTING: Balance importance with novelty/recency
+    # IMPROVED SORTING: Use new ranking system balancing freshness, importance, and quality
     # Fetch all matching events (will be filtered/paginated in Python for better control)
     all_events = query.all()
 
-    # Calculate balanced score combining importance + recency boost
-    from datetime import datetime, timedelta
-
-    def calculate_balanced_score(event: Event) -> float:
-        """
-        Balanced scoring combining importance, verification, and recency.
-
-        Weights:
-        - Importance (40%): What topics matter most
-        - Truth/Confidence (30%): How verified is it
-        - Recency boost (30%): Newer events get preference
-
-        This prevents old articles from permanently dominating just because
-        they have high importance scores.
-        """
-        importance_weight = 0.4
-        confidence_weight = 0.3
-        recency_weight = 0.3
-
-        # 1. Normalize importance (0-100)
-        importance_score = (event.importance_score or 0) / 100.0
-
-        # 2. Normalize truth score (0-100)
-        truth_score = (event.truth_score or 0) / 100.0
-
-        # 3. Recency boost: Decay older events, boost newer ones
-        now = datetime.utcnow()
-        hours_old = (now - event.last_seen).total_seconds() / 3600
-
-        # Recency decay function:
-        # Recent (0-6h): +30 points
-        # 6-12h: +20 points
-        # 12-24h: +10 points
-        # 24-48h: +5 points
-        # >48h: gradual decay
-        if hours_old <= 6:
-            recency_score = 0.95  # Very recent - high boost
-        elif hours_old <= 12:
-            recency_score = 0.75  # Recent - moderate boost
-        elif hours_old <= 24:
-            recency_score = 0.5   # A day old - mild boost
-        elif hours_old <= 48:
-            recency_score = 0.3   # Two days old - small boost
-        else:
-            # After 48 hours, gradual decay: 0.3 - 0.001 per hour
-            decay = max(0.05, 0.3 - (hours_old - 48) * 0.001)
-            recency_score = decay
-
-        # Combine weighted scores
-        balanced_score = (
-            importance_weight * importance_score +
-            confidence_weight * truth_score +
-            recency_weight * recency_score
-        )
-
-        return balanced_score
-
-    # Sort with balanced scoring
-    all_events.sort(key=calculate_balanced_score, reverse=True)
+    # Sort using improved ranking formula that prevents stale events from dominating
+    # Weights: 50% Recency | 25% Importance (with time-decay) | 25% Quality (truth + sources)
+    all_events = rank_events(all_events)
 
     # Apply pagination after sorting
     events = all_events[offset:offset + limit]
@@ -425,54 +370,12 @@ async def search_events(
     # Get total matching count
     total = query.count()
 
-    # Fetch all matching events and apply balanced scoring (same as get_events)
+    # Fetch all matching events and apply improved ranking
     all_events = query.all()
 
-    # Calculate balanced score combining importance + recency boost
-    from datetime import datetime, timedelta
-
-    def calculate_balanced_score(event: Event) -> float:
-        """
-        Balanced scoring combining importance, verification, and recency.
-        (Same logic as get_events endpoint)
-        """
-        importance_weight = 0.4
-        confidence_weight = 0.3
-        recency_weight = 0.3
-
-        # Normalize importance (0-100)
-        importance_score = (event.importance_score or 0) / 100.0
-
-        # Normalize truth score (0-100)
-        truth_score = (event.truth_score or 0) / 100.0
-
-        # Recency boost
-        now = datetime.utcnow()
-        hours_old = (now - event.last_seen).total_seconds() / 3600
-
-        if hours_old <= 6:
-            recency_score = 0.95
-        elif hours_old <= 12:
-            recency_score = 0.75
-        elif hours_old <= 24:
-            recency_score = 0.5
-        elif hours_old <= 48:
-            recency_score = 0.3
-        else:
-            decay = max(0.05, 0.3 - (hours_old - 48) * 0.001)
-            recency_score = decay
-
-        # Combine weighted scores
-        balanced_score = (
-            importance_weight * importance_score +
-            confidence_weight * truth_score +
-            recency_weight * recency_score
-        )
-
-        return balanced_score
-
-    # Sort with balanced scoring
-    all_events.sort(key=calculate_balanced_score, reverse=True)
+    # Sort using improved ranking formula that prevents stale events from dominating
+    # Weights: 50% Recency | 25% Importance (with time-decay) | 25% Quality (truth + sources)
+    all_events = rank_events(all_events)
 
     # Apply pagination after sorting
     events = all_events[offset:offset + limit]

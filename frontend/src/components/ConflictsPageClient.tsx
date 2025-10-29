@@ -98,18 +98,18 @@ export default function ConflictsPageClient({ events, error }: Props) {
                                         How we detect this
                                     </h3>
                                     <p className="text-sm text-blue-800 dark:text-blue-300 mb-3">
-                                        We use semantic analysis to spot when articles use different language and framing
-                                        for the same event. We check for:
+                                        We detect real conflicts by comparing how different sources cover the same event.
+                                        We look for:
                                     </p>
                                     <ul className="list-disc list-inside space-y-1 ml-2 text-sm text-blue-800 dark:text-blue-300">
-                                        <li>Different language/framing (embedding similarity)</li>
-                                        <li>What each side emphasizes (entity & sentiment analysis)</li>
-                                        <li>Political lean (left, center, right sources)</li>
-                                        <li>Different narrative angles (AI perspective detection)</li>
+                                        <li>Different wording and perspective</li>
+                                        <li>What each source emphasizes</li>
+                                        <li>Political perspective of sources (left, center, right)</li>
+                                        <li>Different story angles and framings</li>
                                     </ul>
                                     <p className="text-sm text-blue-800 dark:text-blue-300 mt-3">
-                                        We only flag real conflicts—5+ articles from 3+ sources with &lt;50% keyword overlap.
-                                        Not just headline variations.
+                                        We only flag events with real differences—multiple major sources
+                                        showing truly different viewpoints, not just variations in wording.
                                     </p>
                                 </div>
                             </div>

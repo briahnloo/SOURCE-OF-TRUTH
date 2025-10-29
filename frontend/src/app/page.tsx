@@ -34,9 +34,42 @@ export default async function HomePage() {
                         Top Confirmed Events
                     </h2>
                     <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
-                        Events with confidence scores ≥ 75 verified through multiple sources.
+                        Events with confidence scores ≥ 60 verified through multiple sources.
                         Each event has been rigorously fact-checked and cross-referenced.
                     </p>
+                </div>
+
+                {/* Navigation Guidance Section */}
+                <div className="mb-12 max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="p-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                            <div className="flex items-start gap-3 mb-3">
+                                <span className="text-2xl">📰</span>
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Browse Events</h3>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                Start here to see major verified events. Each event shows multiple perspectives and source breakdown.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
+                            <div className="flex items-start gap-3 mb-3">
+                                <span className="text-2xl">⚖️</span>
+                                <h3 className="font-semibold text-gray-900 dark:text-white">View Conflicts</h3>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                See events with different perspectives. Understand how coverage varies by political leaning and geography.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+                            <div className="flex items-start gap-3 mb-3">
+                                <span className="text-2xl">🔍</span>
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                Use the menu to filter by category, search for specific topics, or check out developing stories.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Content Section */}
@@ -65,7 +98,7 @@ export default async function HomePage() {
                     <div className="max-w-4xl mx-auto">
                         <EmptyState
                             title="No confirmed events yet"
-                            message="Events need high source diversity and official verification to reach confirmed status (≥75). Check the Developing page to see events being verified."
+                            message="Events need high source diversity and official verification to reach confirmed status (≥60). Check the Developing page to see events being verified."
                             actionText="View Developing Events"
                             actionHref="/developing"
                         />

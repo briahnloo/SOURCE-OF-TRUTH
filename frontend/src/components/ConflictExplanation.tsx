@@ -280,9 +280,7 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                             </div>
                                         ))}
                                         <p className="text-xs text-yellow-800 dark:text-yellow-300 mt-2">
-                                            💡 These numbers differ significantly between sources. This could
-                                            indicate different methodologies, time periods, or intentional
-                                            framing differences.
+                                            💡 Different sources report different numbers. This might be due to different counting methods, time periods, or how the data was collected.
                                         </p>
                                     </div>
                                 </div>
@@ -444,10 +442,7 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                                         {excerpt.relevance_score >= 0.8 && (
                                                             <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                                                                 <span>✓</span>
-                                                                <span>
-                                                                    Highly relevant to perspective
-                                                                    differences
-                                                                </span>
+                                                                <span>Key to this perspective</span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -538,10 +533,7 @@ export default function ConflictExplanation({ explanation, severity }: Props) {
                                                                             {excerpt.relevance_score >= 0.8 && (
                                                                                 <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                                                                                     <span>✓</span>
-                                                                                    <span>
-                                                                                        Highly relevant to perspective
-                                                                                        differences
-                                                                                    </span>
+                                                                                    <span>Key to this perspective</span>
                                                                                 </div>
                                                                             )}
                                                                         </div>

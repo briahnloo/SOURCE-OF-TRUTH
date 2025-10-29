@@ -11,7 +11,8 @@ function getApiUrl(): string {
     }
 
     // Client-side: use public API URL or localhost
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    // Fallback to Render backend URL for production (Vercel doesn't read .env files from git)
+    return process.env.NEXT_PUBLIC_API_URL || 'https://truthboard-api.onrender.com';
 }
 
 // Check if backend is available

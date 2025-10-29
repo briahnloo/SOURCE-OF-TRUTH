@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     discord_webhook_url: str = ""
 
     # CORS - just use a simple list with a default
-    allowed_origins_str: str = Field(default="http://localhost:3000,http://localhost:3001", alias="ALLOWED_ORIGINS")
+    allowed_origins_str: str = Field(default="http://localhost:3000,http://localhost:3001,https://groundtruth-sage.vercel.app", alias="ALLOWED_ORIGINS")
 
     @property
     def allowed_origins(self) -> List[str]:

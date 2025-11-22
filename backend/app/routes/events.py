@@ -228,13 +228,18 @@ async def get_events(
     # Get total count
     total = query.count()
 
-    # IMPROVED SORTING: Use new ranking system balancing freshness, importance, and quality
+    # IMPROVED SORTING: Use multi-phase ranking system (Phases 1, 2, 3)
     # Fetch all matching events (will be filtered/paginated in Python for better control)
     all_events = query.all()
 
-    # Sort using improved ranking formula that prevents stale events from dominating
-    # Weights: 50% Recency | 25% Importance (with time-decay) | 25% Quality (truth + sources)
-    all_events = rank_events(all_events)
+    # PHASE 1: Reweighted algorithm (65% recency, 15% importance, 20% quality)
+    # PHASE 2: Category diversity and story momentum boosts
+    # PHASE 3: Section-specific weights based on confidence tier
+    # Weights vary by section:
+    #   - Confirmed: 60% Recency | 20% Importance | 20% Quality
+    #   - Developing: 70% Recency | 15% Importance | 15% Quality
+    #   - All: 65% Recency | 15% Importance | 20% Quality
+    all_events = rank_events(all_events, confidence_tier=status)
 
     # Apply pagination after sorting
     events = all_events[offset:offset + limit]
@@ -373,9 +378,10 @@ async def search_events(
     # Fetch all matching events and apply improved ranking
     all_events = query.all()
 
-    # Sort using improved ranking formula that prevents stale events from dominating
-    # Weights: 50% Recency | 25% Importance (with time-decay) | 25% Quality (truth + sources)
-    all_events = rank_events(all_events)
+    # PHASE 1: Reweighted algorithm (65% recency, 15% importance, 20% quality)
+    # PHASE 2: Category diversity and story momentum boosts
+    # PHASE 3: Section-specific weights (using 'all' tier for search results)
+    all_events = rank_events(all_events, confidence_tier='all')
 
     # Apply pagination after sorting
     events = all_events[offset:offset + limit]

@@ -181,7 +181,7 @@ export default function EventCard({ event }: EventCardProps) {
                     </div>
                 )}
 
-                {/* Unbiased Summary */}
+                {/* Event Summary/Explanation Section */}
                 {event.conflict_explanation && !event.has_conflict && event.sources && (
                     <div className="mb-6">
                         <UnbiasedSummary
@@ -193,6 +193,31 @@ export default function EventCard({ event }: EventCardProps) {
                                 explanation={event.conflict_explanation}
                                 severity={event.conflict_severity || 'low'}
                             />
+                        </div>
+                    </div>
+                )}
+
+                {/* Generic Event Summary (when no conflict explanation exists) */}
+                {!event.conflict_explanation && event.sources && event.sources.length > 0 && (
+                    <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-3 flex items-center gap-2">
+                            <span>📰</span>
+                            <span>Event Overview</span>
+                        </h3>
+                        <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed mb-4">
+                            This event is covered by {event.unique_sources} source{event.unique_sources !== 1 ? 's' : ''} across {event.articles_count} article{event.articles_count !== 1 ? 's' : ''}.
+                            Below you can explore how different outlets are reporting on this story.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                                📊 {event.unique_sources} Source{event.unique_sources !== 1 ? 's' : ''}
+                            </span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                                📄 {event.articles_count} Article{event.articles_count !== 1 ? 's' : ''}
+                            </span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                                ✓ {Math.round(event.truth_score || 0)} Confidence
+                            </span>
                         </div>
                     </div>
                 )}

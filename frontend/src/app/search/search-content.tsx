@@ -54,40 +54,40 @@ export default function SearchContent() {
           {query && <span>Searching for: <span className="font-semibold">&quot;{query}&quot;</span></span>}
         </p>
 
+        {/* Search Context Guide - Always show when query exists */}
+        {query && !loading && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-6">
+            <div>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-3 flex items-center gap-2 text-lg">
+                <span>💡</span>
+                <span>What these results show</span>
+              </h3>
+              <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+                <li>📊 All events mentioning &quot;{query}&quot; across news sources</li>
+                <li>📈 Coverage intensity and source diversity</li>
+                <li>🖼️ How different outlets frame the same story</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-3 flex items-center gap-2 text-lg">
+                <span>🔍</span>
+                <span>How to use these results</span>
+              </h3>
+              <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+                <li>👁️ Click any event to see all perspectives</li>
+                <li>⚖️ Compare how different sources cover it</li>
+                <li>⚠️ Check for narrative conflicts or gaps</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
         {/* Results Summary */}
         {query && events && !loading && (
           <div className="space-y-4">
-            <p className="text-lg text-gray-600 dark:text-gray-400">
+            <p className="text-lg text-gray-600 dark:text-gray-400 font-semibold">
               Found {events.total} event{events.total !== 1 ? 's' : ''}
             </p>
-
-            {/* Search Context Guide */}
-            {events.total > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div>
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-2 flex items-center gap-2">
-                    <span>💡</span>
-                    <span>What these results show</span>
-                  </h3>
-                  <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-                    <li>• All events mentioning &quot;{query}&quot; across news sources</li>
-                    <li>• Coverage intensity and source diversity</li>
-                    <li>• How different outlets frame the same story</li>
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-2 flex items-center gap-2">
-                    <span>🔍</span>
-                    <span>How to use these results</span>
-                  </h3>
-                  <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-                    <li>• Click any event to see all perspectives</li>
-                    <li>• Compare how different sources cover it</li>
-                    <li>• Check for narrative conflicts or gaps</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         )}
 

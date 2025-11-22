@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
 import NavLink from '@/components/NavLink';
+import MobileMenu from '@/components/MobileMenu';
 import { SearchBar } from '@/components/SearchBar';
 
 export const metadata: Metadata = {
@@ -67,20 +68,12 @@ export default function RootLayout({
                                             Truthboard
                                         </h1>
                                     </Link>
+                                    <MobileMenu />
                                 </div>
                                 {/* Mobile search bar - full width */}
                                 <div className="px-0 py-2">
                                     <SearchBar />
                                 </div>
-                                {/* Mobile navigation */}
-                                <nav className="flex flex-col space-y-1 py-2 border-t border-gray-200/20 dark:border-gray-700/20">
-                                    <NavLink href="/">Confirmed</NavLink>
-                                    <NavLink href="/developing">Developing</NavLink>
-                                    <NavLink href="/conflicts">Conflicts</NavLink>
-                                    <NavLink href="/polarizing">Polarizing</NavLink>
-                                    <NavLink href="/flagged">Flagged</NavLink>
-                                    <NavLink href="/stats">Stats</NavLink>
-                                </nav>
                             </div>
                         </div>
                     </header>

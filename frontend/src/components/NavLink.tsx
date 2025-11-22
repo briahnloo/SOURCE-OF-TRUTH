@@ -6,15 +6,17 @@ import { usePathname } from 'next/navigation';
 interface NavLinkProps {
     href: string;
     children: React.ReactNode;
+    onClick?: () => void;
 }
 
-export default function NavLink({ href, children }: NavLinkProps) {
+export default function NavLink({ href, children, onClick }: NavLinkProps) {
     const pathname = usePathname();
     const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
 
     return (
         <Link
             href={href}
+            onClick={onClick}
             className={`
                 relative px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 group
                 ${isActive

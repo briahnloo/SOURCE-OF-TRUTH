@@ -13,7 +13,7 @@ databases:
 services:
   # Backend API (includes scheduled worker via APScheduler)
   - type: web
-    name: truthlayer-backend
+    name: truthboard-api
     runtime: docker
     region: oregon
     plan: standard
@@ -26,8 +26,8 @@ services:
           name: truthlayer-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        value: https://groundtruth.vercel.app
-        # Update this after Vercel deployment with your actual frontend URL
+        value: https://groundtruth-sage.vercel.app,https://groundtruth.vercel.app,http://localhost:3000,http://localhost:3001
+        # Multiple frontend URLs for CORS support
       - key: NEWSAPI_KEY
         sync: false
       - key: MEDIASTACK_KEY
